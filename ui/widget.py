@@ -18,6 +18,19 @@ class PullTrackerWidget(ctk.CTk):
         self.configure(fg_color="#1e1e24")
 
         self.selected_game = "HSR"
+        self.drag_handle = ctk.CTkFrame(
+            self,
+            width=380,
+            height=12,
+            fg_color="#2b2b32",
+            corner_radius=4,
+        )
+        self.drag_handle.pack(pady=(6, 0))
+        self.drag_handle.pack_propagate(False)
+        self.drag_handle.bind("<ButtonPress-1>", self.start_move)
+        self.drag_handle.bind("<B1-Motion>", self.do_move)
+        self.drag_handle.bind("<ButtonRelease-1>", self.stop_move)
+
         self.game_tabs = ctk.CTkTabview(self, width=340, height=42, command=self.select_game)
         self.game_tabs.add("HSR")
         self.game_tabs.add("ZZZ")
@@ -97,9 +110,12 @@ class PullTrackerWidget(ctk.CTk):
         self.loading = False
         self.refresh_after_id = None
         self.recent_pulls = []
+        self.dragging = False
 
-        self.bind("<ButtonPress-1>", self.start_move)
-        self.bind("<B1-Motion>", self.do_move)
+        for drag_widget in (self.title_label, self.pity_label, self.status_label):
+            drag_widget.bind("<ButtonPress-1>", self.start_move)
+            drag_widget.bind("<B1-Motion>", self.do_move)
+            drag_widget.bind("<ButtonRelease-1>", self.stop_move)
         self.after_idle(self.adjust_window_size)
 
     def select_game(self):
@@ -258,29 +274,20 @@ class PullTrackerWidget(ctk.CTk):
         self.use_pasted_link()
 
     def start_move(self, event):
-        if self.is_scroll_event(event):
-            return "break"
-        self.x = event.x
-        self.y = event.y
+        self.dragging = True
+        self.x = event.x_root
+        self.y = event.y_root
 
     def do_move(self, event):
-        if self.is_scroll_event(event):
-            return "break"
-        deltax = event.x - self.x
-        deltay = event.y - self.y
+        if not self.dragging:
+            return
+        deltax = event.x_root - self.x
+        deltay = event.y_root - self.y
         x = self.winfo_x() + deltax
         y = self.winfo_y() + deltay
         self.geometry(f"+{x}+{y}")
+        self.x = event.x_root
+        self.y = event.y_root
 
-    def is_scroll_event(self, event):
-        widget = event.widget
-        while widget is not None:
-            if widget == self.recent_pulls_frame:
-                return True
-            if "scrollbar" in widget.winfo_class().lower():
-                return True
-            parent_name = widget.winfo_parent()
-            if not parent_name:
-                break
-            widget = self.nametowidget(parent_name)
-        return False
+    def stop_move(self, _event):
+        self.dragging = False
