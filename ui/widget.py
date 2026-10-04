@@ -15,6 +15,7 @@ class PullTrackerWidget(ctk.CTk):
         self.geometry("420x220")
         self.overrideredirect(True)
         self.attributes("-topmost", True)
+        self.attributes("-alpha", 0.88)
         self.configure(fg_color="#1e1e24")
 
         self.selected_game = "HSR"
