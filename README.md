@@ -61,7 +61,8 @@ The widget checks the API every 60 seconds after a pasted link is loaded. If the
 
 - Reads HSR character event warp history (`gacha_type=11`) or ZZZ signal search history (`gacha_type=2`), based on the selected tab.
 - Displays pity as pulls since the latest 5-star, up to the 90-pull hard pity limit.
-- Shows the eight most recent pulls after a successful load.
+- Shows all pulls returned by the API after a successful load.
+- Filters recent pulls by rarity, with 4★ and 5★ enabled by default.
 - Color-codes recent pulls by rarity: blue for 3★, purple for 4★, and gold for 5★.
 - Marks the next limited 5-star as guaranteed after a loss to one of the seven standard 5-star characters.
 - Requests only the first 20 history entries. Older history is not searched, so pity and guarantee status can be incomplete when the latest 5-star is not on the first page.
