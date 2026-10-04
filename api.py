@@ -42,4 +42,17 @@ def fetch_pity_data(authkey, config, history_params=None):
             break
         pity_count += 1
 
-    return {"pity": pity_count, "guaranteed": is_guaranteed}
+    recent_pulls = [
+        {
+            "name": pull["name"],
+            "item_type": pull["item_type"],
+            "rank_type": pull["rank_type"],
+            "time": pull["time"],
+        }
+        for pull in pulls
+    ]
+    return {
+        "pity": pity_count,
+        "guaranteed": is_guaranteed,
+        "recent_pulls": recent_pulls,
+    }

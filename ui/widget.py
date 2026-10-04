@@ -12,7 +12,7 @@ class PullTrackerWidget(ctk.CTk):
         super().__init__()
 
         self.title("Pull Tracker Widget")
-        self.geometry("420x280")
+        self.geometry("420x220")
         self.overrideredirect(True)
         self.attributes("-topmost", True)
         self.configure(fg_color="#1e1e24")
@@ -59,6 +59,13 @@ class PullTrackerWidget(ctk.CTk):
         )
         self.history_url_entry.pack(pady=(0, 6))
 
+        self.recent_pulls_frame = ctk.CTkScrollableFrame(
+            self,
+            width=390,
+            height=170,
+            label_text="Recent pulls",
+        )
+
         self.load_button = ctk.CTkButton(
             self,
             text="Use Pasted Link",
@@ -76,6 +83,7 @@ class PullTrackerWidget(ctk.CTk):
 
         self.bind("<ButtonPress-1>", self.start_move)
         self.bind("<B1-Motion>", self.do_move)
+        self.after_idle(self.adjust_window_size)
 
     def select_game(self):
         self.selected_game = self.game_tabs.get()
@@ -83,11 +91,14 @@ class PullTrackerWidget(ctk.CTk):
         self.title_label.configure(text=config["title"])
         self.pity_label.configure(text=f"-- / {config['hard_pity']}")
         self.status_label.configure(text="Open in-game history first", text_color="#ff5555")
-        self.load_button.configure(state="normal", text="Use Pasted Link")
+        self.recent_pulls_frame.pack_forget()
+        self.history_url_entry.pack(pady=(0, 6))
+        self.load_button.configure(state="normal", text="Use Pasted Link", command=self.use_pasted_link)
         self.loading = False
         if self.refresh_after_id is not None:
             self.after_cancel(self.refresh_after_id)
             self.refresh_after_id = None
+        self.adjust_window_size()
 
     def load_history(self):
         if self.loading:
@@ -151,8 +162,52 @@ class PullTrackerWidget(ctk.CTk):
             status_text = "Guaranteed Limited!" if data["guaranteed"] else "Next 5★ is a 50/50"
             color = "#55ff55" if data["guaranteed"] else "#f0c05a"
             self.status_label.configure(text=status_text, text_color=color)
+            self.show_recent_pulls(data["recent_pulls"])
+            self.history_url_entry.pack_forget()
+            self.recent_pulls_frame.pack(pady=(0, 6))
+            self.load_button.configure(text="Submit Link Again", command=self.show_link_input)
+            self.adjust_window_size()
 
         self.refresh_after_id = self.after(60000, self.refresh_history)
+
+    def show_recent_pulls(self, pulls):
+        for child in self.recent_pulls_frame.winfo_children():
+            child.destroy()
+
+        for pull in pulls[:8]:
+            rank = f"{pull['rank_type']}★"
+            rarity_colors = {
+                "3": "#6fa8dc",
+                "4": "#b58bd9",
+                "5": "#f0c05a",
+            }
+            label = ctk.CTkLabel(
+                self.recent_pulls_frame,
+                text=f"{pull['time']}  {rank}  {pull['name']}",
+                anchor="w",
+                text_color=rarity_colors.get(str(pull["rank_type"]), "#ffffff"),
+            )
+            label.pack(fill="x", padx=4, pady=1)
+
+    def show_link_input(self):
+        if self.refresh_after_id is not None:
+            self.after_cancel(self.refresh_after_id)
+            self.refresh_after_id = None
+        self.recent_pulls_frame.pack_forget()
+        self.history_url_entry.pack(pady=(0, 6))
+        self.load_button.configure(text="Use Pasted Link", command=self.use_pasted_link)
+        self.status_label.configure(text="Paste a new history URL.", text_color="#a0a0b5")
+        self.adjust_window_size()
+
+    def adjust_window_size(self):
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        width = max(420, self.winfo_reqwidth() + 16)
+        height = min(self.winfo_reqheight() + 16, screen_height - 20)
+        x = min(max(0, self.winfo_x()), max(0, screen_width - width))
+        y = min(max(0, self.winfo_y()), max(0, screen_height - height))
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def refresh_history(self):
         self.refresh_after_id = None
