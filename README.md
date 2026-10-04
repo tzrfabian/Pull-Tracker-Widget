@@ -23,8 +23,6 @@ python -m venv .venv
 .venv\Scripts\python.exe pull_tracker_widget.py
 ```
 
-The widget starts at `420x280`, stays above other windows, and can be dragged by holding the left mouse button anywhere on it. Use the `HSR` and `ZZZ` tabs to choose the game.
-
 ## Setup and refresh
 
 1. Select the game tab.
@@ -40,6 +38,8 @@ The extractor validates the URL with the game API, creates a fresh usable histor
 ```
 
 This command is for the Windows Star Rail client. It opens the cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
+
+After a successful load, the URL field is hidden and the widget shows the eight most recent pulls. Click **Submit Link Again** to paste a new history URL.
 
 The script looks for the authkey in the cache file below. On newer game versions where that cache file is not present, it also reads the game's `Player.log` beside the `Data` folder.
 
@@ -61,6 +61,8 @@ The widget checks the API every 60 seconds after a pasted link is loaded. If the
 
 - Reads HSR character event warp history (`gacha_type=11`) or ZZZ signal search history (`gacha_type=2`), based on the selected tab.
 - Displays pity as pulls since the latest 5-star, up to the 90-pull hard pity limit.
+- Shows the eight most recent pulls after a successful load.
+- Color-codes recent pulls by rarity: blue for 3★, purple for 4★, and gold for 5★.
 - Marks the next limited 5-star as guaranteed after a loss to one of the seven standard 5-star characters.
 - Requests only the first 20 history entries. Older history is not searched, so pity and guarantee status can be incomplete when the latest 5-star is not on the first page.
 - Shows API or cache errors in the status line.
