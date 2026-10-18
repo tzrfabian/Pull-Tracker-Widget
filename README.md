@@ -25,8 +25,8 @@ python -m venv .venv
 
 ## Setup and refresh
 
-1. Select the game tab.
-2. Open that game and open its character event or signal search history.
+1. Select the game tab and then select the warp or channel to track.
+2. Open that game and open the selected warp or channel's history.
 3. Leave the history available, then run the extractor for the selected game below.
 4. Paste the URL copied to your clipboard into the widget.
 5. Press **Use Pasted Link**.
@@ -35,7 +35,7 @@ The extractors validate the URL with the game API, create a fresh usable history
 
 ### HSR
 
-Run this while HSR's character event warp history is open:
+Run this while the selected HSR warp history is open:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; Invoke-Expression (New-Object Net.WebClient).DownloadString("https://gist.githubusercontent.com/Star-Rail-Station/2512df54c4f35d399cc9abbde665e8f0/raw/get_warp_link_os.ps1?cachebust=srs")
@@ -43,7 +43,7 @@ Run this while HSR's character event warp history is open:
 
 ### ZZZ
 
-Run this while ZZZ's Signal Search history is open:
+Run this while the selected ZZZ channel history is open:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; Invoke-Expression (New-Object Net.WebClient).DownloadString("https://gist.github.com/Star-Rail-Station/2147c886045beec7cefc301508bd83d3/raw/d0f2ad962539e52ed56bdcf6972943e9cae6d182/get_signal_link_os.ps1")
@@ -52,6 +52,7 @@ Run this while ZZZ's Signal Search history is open:
 Each command opens the appropriate game's cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
 
 After a successful load, the URL field is hidden and the widget shows the eight most recent pulls. Click **Submit Link Again** to paste a new history URL.
+After the first successful submission, switching between warp or channel sub-tabs automatically reloads the selected banner using the saved history link.
 
 The script looks for the authkey in the cache file below. On newer game versions where that cache file is not present, it also reads the game's `Player.log` beside the `Data` folder.
 
@@ -71,7 +72,7 @@ The widget checks the API every 60 seconds after a pasted link is loaded. If the
 
 ## Current behavior
 
-- Reads HSR character event warp history (`gacha_type=11`) or ZZZ exclusive agent signal search history (`gacha_type=2001`), based on the selected tab.
+- Reads the selected HSR warp: Character Event (`gacha_type=11`), Light Cone Event (`gacha_type=12`), Stellar (`gacha_type=1`), Departure (`gacha_type=2`), Character Collaboration (`gacha_type=21`), or Light Cone Collaboration (`gacha_type=22`); or the selected ZZZ channel: Exclusive (`gacha_type=2001`), Stable (`gacha_type=1`), W-Engine (`gacha_type=3001`), or Bangboo (`gacha_type=5001`).
 - Uses the HSR `api-os-takumi` history endpoint and the ZZZ `public-operation-nap-sg` endpoint, including ZZZ's `game_biz=nap_global` parameter.
 - Displays pity as pulls since the latest highest-rarity pull, up to the 90-pull hard pity limit.
 - Shows all pulls returned by the API after a successful load.
