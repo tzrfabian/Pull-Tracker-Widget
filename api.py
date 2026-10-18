@@ -6,15 +6,16 @@ def fetch_pity_data(authkey, config, history_params=None):
     history_params = history_params or {}
     endpoint = history_params.pop(
         "_endpoint",
-        "https://api-os-takumi.mihoyo.com/common/gacha_record/api/getGachaLog",
+        config["history_endpoint"],
     )
+    region = config.get("region") or history_params.get("region")
     params = {
         **history_params,
         "authkey_ver": 1,
         "lang": history_params.get("lang", "en"),
         "authkey": authkey,
         "gacha_id": config.get("gacha_id"),
-        "region": config.get("region", history_params.get("region", "prod_official_asia")),
+        "game_biz": config.get("game_biz"),
         "gacha_type": config["gacha_type"],
         "default_gacha_type": config["gacha_type"],
         "timestamp": int(time.time()),
@@ -23,6 +24,8 @@ def fetch_pity_data(authkey, config, history_params=None):
         "size": 20,
         "end_id": 0,
     }
+    if region:
+        params["region"] = region
 
     response = requests.get(endpoint, params=params, timeout=15)
     response.raise_for_status()
@@ -37,7 +40,7 @@ def fetch_pity_data(authkey, config, history_params=None):
     is_guaranteed = False
 
     for pull in pulls:
-        if pull["rank_type"] == "5":
+        if pull["rank_type"] == config["highest_rarity"]:
             is_guaranteed = pull["name"] in config["standard_characters"]
             break
         pity_count += 1

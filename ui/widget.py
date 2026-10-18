@@ -80,21 +80,8 @@ class PullTrackerWidget(ctk.CTk):
             label_text="Recent pulls",
         )
         self.filter_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.filter_vars = {
-            "3": ctk.BooleanVar(value=False),
-            "4": ctk.BooleanVar(value=True),
-            "5": ctk.BooleanVar(value=True),
-        }
-        for rarity, color in (("3", "#6fa8dc"), ("4", "#b58bd9"), ("5", "#f0c05a")):
-            checkbox = ctk.CTkCheckBox(
-                self.filter_frame,
-                text=f"{rarity}★",
-                variable=self.filter_vars[rarity],
-                command=self.apply_pull_filters,
-                text_color=color,
-                width=72,
-            )
-            checkbox.pack(side="left", padx=4)
+        self.filter_vars = {}
+        self.configure_rarity_filters()
 
         self.load_button = ctk.CTkButton(
             self,
@@ -119,17 +106,32 @@ class PullTrackerWidget(ctk.CTk):
             drag_widget.bind("<ButtonRelease-1>", self.stop_move)
         self.after_idle(self.adjust_window_size)
 
+    def configure_rarity_filters(self):
+        for child in self.filter_frame.winfo_children():
+            child.destroy()
+
+        self.filter_vars = {}
+        for rarity, rarity_config in GAME_CONFIGS[self.selected_game]["rarities"].items():
+            self.filter_vars[rarity] = ctk.BooleanVar(value=rarity_config["enabled"])
+            checkbox = ctk.CTkCheckBox(
+                self.filter_frame,
+                text=rarity_config["label"],
+                variable=self.filter_vars[rarity],
+                command=self.apply_pull_filters,
+                text_color=rarity_config["color"],
+                width=72,
+            )
+            checkbox.pack(side="left", padx=4)
+
     def select_game(self):
         self.selected_game = self.game_tabs.get()
         config = GAME_CONFIGS[self.selected_game]
         self.title_label.configure(text=config["title"])
         self.pity_label.configure(text=f"-- / {config['hard_pity']}")
-        self.status_label.configure(text="Open in-game history first", text_color="#ff5555")
+        self.status_label.configure(text="Don't forget open in-game history first", text_color="#ff5555")
         self.recent_pulls_frame.pack_forget()
         self.filter_frame.pack_forget()
-        self.filter_vars["3"].set(False)
-        self.filter_vars["4"].set(True)
-        self.filter_vars["5"].set(True)
+        self.configure_rarity_filters()
         self.history_url_entry.pack(pady=(0, 6))
         self.load_button.configure(state="normal", text="Use Pasted Link", command=self.use_pasted_link)
         self.loading = False
@@ -197,7 +199,11 @@ class PullTrackerWidget(ctk.CTk):
             self.status_label.configure(text=data["error"], text_color="#ff5555")
         else:
             self.pity_label.configure(text=f"{data['pity']} / {config['hard_pity']}")
-            status_text = "Guaranteed Limited!" if data["guaranteed"] else "Next 5★ is a 50/50"
+            status_text = (
+                "Guaranteed Limited!"
+                if data["guaranteed"]
+                else f"Next {config['highest_rarity_label']} is a 50/50"
+            )
             color = "#55ff55" if data["guaranteed"] else "#f0c05a"
             self.status_label.configure(text=status_text, text_color=color)
             self.recent_pulls = data["recent_pulls"]
@@ -214,18 +220,15 @@ class PullTrackerWidget(ctk.CTk):
         for child in self.recent_pulls_frame.winfo_children():
             child.destroy()
 
-        rarity_colors = {
-            "3": "#6fa8dc",
-            "4": "#b58bd9",
-            "5": "#f0c05a",
-        }
+        rarity_configs = GAME_CONFIGS[self.selected_game]["rarities"]
         for pull in pulls:
-            rank = f"{pull['rank_type']}★"
+            rarity_config = rarity_configs.get(str(pull["rank_type"]))
+            rank = rarity_config["label"] if rarity_config else str(pull["rank_type"])
             label = ctk.CTkLabel(
                 self.recent_pulls_frame,
                 text=f"{pull['time']}  {rank}  {pull['name']}",
                 anchor="w",
-                text_color=rarity_colors.get(str(pull["rank_type"]), "#ffffff"),
+                text_color=rarity_config["color"] if rarity_config else "#ffffff",
             )
             label.pack(fill="x", padx=4, pady=1)
 
