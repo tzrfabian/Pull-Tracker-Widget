@@ -123,6 +123,7 @@ class PullTrackerWidget(ctk.CTk):
         self.loading = False
         self.refresh_after_id = None
         self.recent_pulls = []
+        self.history_urls = {}
         self.dragging = False
 
         for drag_widget in (self.title_label, self.pity_label, self.status_label):
@@ -204,6 +205,13 @@ class PullTrackerWidget(ctk.CTk):
         if self.refresh_after_id is not None:
             self.after_cancel(self.refresh_after_id)
             self.refresh_after_id = None
+        saved_history_url = self.history_urls.get(self.selected_game)
+        if saved_history_url:
+            self.start_pasted_history(
+                saved_history_url,
+                "Loading selected banner...",
+                allow_gacha_type_mismatch=True,
+            )
         self.adjust_window_size()
 
     def load_history(self):
@@ -218,32 +226,41 @@ class PullTrackerWidget(ctk.CTk):
         threading.Thread(target=self.fetch_history, args=(game, banner), daemon=True).start()
 
     def use_pasted_link(self):
-        history_url = self.history_url_entry.get().strip()
+        history_url = self.history_url_entry.get().strip() or self.history_urls.get(self.selected_game, "")
         if not history_url:
             self.status_label.configure(text="Paste the in-game history URL first.", text_color="#ff5555")
             return
         if self.loading:
             return
 
+        self.start_pasted_history(history_url, "Loading pasted history...")
+
+    def start_pasted_history(self, history_url, status_text, allow_gacha_type_mismatch=False):
+        if self.loading:
+            return
         self.loading = True
         self.load_button.configure(state="disabled", text="Loading...")
-        self.status_label.configure(text="Loading pasted history...", text_color="#a0a0b5")
+        self.status_label.configure(text=status_text, text_color="#a0a0b5")
         game = self.selected_game
         banner = self.selected_banner
         threading.Thread(
             target=self.fetch_pasted_history,
-            args=(game, banner, history_url),
+            args=(game, banner, history_url, allow_gacha_type_mismatch),
             daemon=True,
         ).start()
 
-    def fetch_pasted_history(self, game, banner, history_url):
+    def fetch_pasted_history(self, game, banner, history_url, allow_gacha_type_mismatch=False):
         extractor = EXTRACTORS[game]
         banner_config = GAME_CONFIGS[game]["banners"][banner]
         try:
-            result = extractor.fetch_pity_data_from_url(history_url, banner_config)
+            result = extractor.fetch_pity_data_from_url(
+                history_url,
+                banner_config,
+                allow_gacha_type_mismatch=allow_gacha_type_mismatch,
+            )
         except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
             result = {"error": f"Unable to load history: {error}"}
-        self.after(0, self.show_history_result, game, banner, result)
+        self.after(0, self.show_history_result, game, banner, result, history_url)
 
     def fetch_history(self, game, banner):
         banner_config = GAME_CONFIGS[game]["banners"][banner]
@@ -260,7 +277,7 @@ class PullTrackerWidget(ctk.CTk):
 
         self.after(0, self.show_history_result, game, banner, result)
 
-    def show_history_result(self, game, banner, data):
+    def show_history_result(self, game, banner, data, history_url=None):
         if game != self.selected_game or banner != self.selected_banner:
             return
 
@@ -271,6 +288,8 @@ class PullTrackerWidget(ctk.CTk):
         if "error" in data:
             self.status_label.configure(text=data["error"], text_color="#ff5555")
         else:
+            if history_url:
+                self.history_urls[game] = history_url
             self.pity_label.configure(text=f"{data['pity']} / {config['hard_pity']}")
             status_text = (
                 "Guaranteed Limited!"
