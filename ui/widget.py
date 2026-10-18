@@ -1,7 +1,9 @@
 import threading
+from pathlib import Path
 
 import customtkinter as ctk
 import requests
+from PIL import Image
 
 from config import GAME_CONFIGS
 from extractors import EXTRACTORS
@@ -32,9 +34,18 @@ class PullTrackerWidget(ctk.CTk):
         self.drag_handle.bind("<B1-Motion>", self.do_move)
         self.drag_handle.bind("<ButtonRelease-1>", self.stop_move)
 
+        assets_dir = Path(__file__).resolve().parent.parent / "assets"
+        self.game_icons = {
+            game: self.create_game_icon(assets_dir / f"{game.lower()}_icon.png")
+            for game in GAME_CONFIGS
+        }
         self.game_tabs = ctk.CTkTabview(self, width=340, height=42, command=self.select_game)
-        self.game_tabs.add("HSR")
-        self.game_tabs.add("ZZZ")
+        for game in GAME_CONFIGS:
+            self.game_tabs.add(game)
+            self.game_tabs._segmented_button._buttons_dict[game].configure(
+                image=self.game_icons[game],
+                compound="left",
+            )
         self.game_tabs.set(self.selected_game)
         self.game_tabs.pack(pady=(8, 0))
 
@@ -105,6 +116,19 @@ class PullTrackerWidget(ctk.CTk):
             drag_widget.bind("<B1-Motion>", self.do_move)
             drag_widget.bind("<ButtonRelease-1>", self.stop_move)
         self.after_idle(self.adjust_window_size)
+
+    @staticmethod
+    def create_game_icon(path):
+        with Image.open(path) as source:
+            icon = source.convert("RGBA")
+        icon.thumbnail((22, 22), Image.Resampling.LANCZOS)
+
+        canvas = Image.new("RGBA", (22, 22))
+        canvas.alpha_composite(
+            icon,
+            ((22 - icon.width) // 2, (22 - icon.height) // 2),
+        )
+        return ctk.CTkImage(light_image=canvas, dark_image=canvas, size=(22, 22))
 
     def configure_rarity_filters(self):
         for child in self.filter_frame.winfo_children():
