@@ -21,6 +21,7 @@ class PullTrackerWidget(ctk.CTk):
         self.configure(fg_color="#1e1e24")
 
         self.selected_game = "HSR"
+        self.selected_banner = "character_event"
         self.drag_handle = ctk.CTkFrame(
             self,
             width=380,
@@ -49,6 +50,19 @@ class PullTrackerWidget(ctk.CTk):
         self.game_tabs.set(self.selected_game)
         self.game_tabs.pack(pady=(8, 0))
 
+        self.banner_tabs = ctk.CTkSegmentedButton(
+            self,
+            values=[
+                banner_config["label"]
+                for banner_config in GAME_CONFIGS[self.selected_game]["banners"].values()
+            ],
+            command=self.select_banner,
+            width=340,
+            height=28,
+        )
+        self.banner_tabs.set(self.get_selected_config()["label"])
+        self.banner_tabs.pack(pady=(4, 0))
+
         self.close_button = ctk.CTkButton(
             self,
             text="X",
@@ -61,10 +75,10 @@ class PullTrackerWidget(ctk.CTk):
         )
         self.close_button.place(relx=1.0, x=-8, y=8, anchor="ne")
 
-        self.title_label = ctk.CTkLabel(self, text=GAME_CONFIGS[self.selected_game]["title"], font=("Arial", 14, "bold"), text_color="#a0a0b5")
+        self.title_label = ctk.CTkLabel(self, text=self.get_selected_config()["title"], font=("Arial", 14, "bold"), text_color="#a0a0b5")
         self.title_label.pack(pady=(10, 0))
 
-        self.pity_label = ctk.CTkLabel(self, text="-- / 90", font=("Arial", 32, "bold"), text_color="#ffffff")
+        self.pity_label = ctk.CTkLabel(self, text=f"-- / {self.get_selected_config()['hard_pity']}", font=("Arial", 32, "bold"), text_color="#ffffff")
         self.pity_label.pack()
 
         self.status_label = ctk.CTkLabel(
@@ -117,6 +131,19 @@ class PullTrackerWidget(ctk.CTk):
             drag_widget.bind("<ButtonRelease-1>", self.stop_move)
         self.after_idle(self.adjust_window_size)
 
+    def get_banner_keys(self):
+        return list(GAME_CONFIGS[self.selected_game]["banners"])
+
+    def get_selected_config(self):
+        return GAME_CONFIGS[self.selected_game]["banners"][self.selected_banner]
+
+    def configure_banner_tabs(self):
+        banner_configs = GAME_CONFIGS[self.selected_game]["banners"]
+        self.banner_tabs.configure(
+            values=[banner_config["label"] for banner_config in banner_configs.values()]
+        )
+        self.banner_tabs.set(banner_configs[self.selected_banner]["label"])
+
     @staticmethod
     def create_game_icon(path):
         with Image.open(path) as source:
@@ -135,7 +162,7 @@ class PullTrackerWidget(ctk.CTk):
             child.destroy()
 
         self.filter_vars = {}
-        for rarity, rarity_config in GAME_CONFIGS[self.selected_game]["rarities"].items():
+        for rarity, rarity_config in self.get_selected_config()["rarities"].items():
             self.filter_vars[rarity] = ctk.BooleanVar(value=rarity_config["enabled"])
             checkbox = ctk.CTkCheckBox(
                 self.filter_frame,
@@ -149,7 +176,22 @@ class PullTrackerWidget(ctk.CTk):
 
     def select_game(self):
         self.selected_game = self.game_tabs.get()
-        config = GAME_CONFIGS[self.selected_game]
+        self.selected_banner = self.get_banner_keys()[0]
+        self.configure_banner_tabs()
+        self.reset_for_selection()
+
+    def select_banner(self, banner_label=None):
+        if banner_label is None:
+            banner_label = self.banner_tabs.get()
+        self.selected_banner = next(
+            key
+            for key, config in GAME_CONFIGS[self.selected_game]["banners"].items()
+            if config["label"] == banner_label
+        )
+        self.reset_for_selection()
+
+    def reset_for_selection(self):
+        config = self.get_selected_config()
         self.title_label.configure(text=config["title"])
         self.pity_label.configure(text=f"-- / {config['hard_pity']}")
         self.status_label.configure(text="Don't forget open in-game history first", text_color="#ff5555")
@@ -172,7 +214,8 @@ class PullTrackerWidget(ctk.CTk):
         self.load_button.configure(state="disabled", text="Loading...")
         self.status_label.configure(text="Reading pull history...", text_color="#a0a0b5")
         game = self.selected_game
-        threading.Thread(target=self.fetch_history, args=(game,), daemon=True).start()
+        banner = self.selected_banner
+        threading.Thread(target=self.fetch_history, args=(game, banner), daemon=True).start()
 
     def use_pasted_link(self):
         history_url = self.history_url_entry.get().strip()
@@ -186,36 +229,42 @@ class PullTrackerWidget(ctk.CTk):
         self.load_button.configure(state="disabled", text="Loading...")
         self.status_label.configure(text="Loading pasted history...", text_color="#a0a0b5")
         game = self.selected_game
-        threading.Thread(target=self.fetch_pasted_history, args=(game, history_url), daemon=True).start()
+        banner = self.selected_banner
+        threading.Thread(
+            target=self.fetch_pasted_history,
+            args=(game, banner, history_url),
+            daemon=True,
+        ).start()
 
-    def fetch_pasted_history(self, game, history_url):
+    def fetch_pasted_history(self, game, banner, history_url):
         extractor = EXTRACTORS[game]
+        banner_config = GAME_CONFIGS[game]["banners"][banner]
         try:
-            result = extractor.fetch_pity_data_from_url(history_url)
+            result = extractor.fetch_pity_data_from_url(history_url, banner_config)
         except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
             result = {"error": f"Unable to load history: {error}"}
-        self.after(0, self.show_history_result, game, result)
+        self.after(0, self.show_history_result, game, banner, result)
 
-    def fetch_history(self, game):
-        config = GAME_CONFIGS[game]
+    def fetch_history(self, game, banner):
+        banner_config = GAME_CONFIGS[game]["banners"][banner]
         extractor = EXTRACTORS[game]
 
         try:
-            authkey = extractor.get_authkey()
+            authkey = extractor.get_authkey(banner_config)
             if not authkey:
                 result = {"error": "History source not found. Reopen in-game history."}
             else:
-                result = extractor.fetch_pity_data(authkey)
+                result = extractor.fetch_pity_data(authkey, banner_config)
         except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
             result = {"error": f"Unable to load history: {error}"}
 
-        self.after(0, self.show_history_result, game, result)
+        self.after(0, self.show_history_result, game, banner, result)
 
-    def show_history_result(self, game, data):
-        if game != self.selected_game:
+    def show_history_result(self, game, banner, data):
+        if game != self.selected_game or banner != self.selected_banner:
             return
 
-        config = GAME_CONFIGS[game]
+        config = self.get_selected_config()
         self.loading = False
         self.load_button.configure(state="normal", text="Use Pasted Link")
 
@@ -244,7 +293,7 @@ class PullTrackerWidget(ctk.CTk):
         for child in self.recent_pulls_frame.winfo_children():
             child.destroy()
 
-        rarity_configs = GAME_CONFIGS[self.selected_game]["rarities"]
+        rarity_configs = self.get_selected_config()["rarities"]
         for pull in pulls:
             rarity_config = rarity_configs.get(str(pull["rank_type"]))
             rank = rarity_config["label"] if rarity_config else str(pull["rank_type"])
