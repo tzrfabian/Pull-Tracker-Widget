@@ -19,4 +19,5 @@ def fetch_pity_data_from_url(history_url):
     params = get_history_params_from_url(history_url, CONFIG["gacha_type"])
     if not params:
         return {"error": "Invalid ZZZ Signal Search URL."}
+    params["_endpoint"] = CONFIG["history_endpoint"]
     return fetch_api_pity_data(params["authkey"], CONFIG, params)

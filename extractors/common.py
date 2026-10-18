@@ -18,7 +18,12 @@ def _get_query_params(data, gacha_type=None):
         url = url_bytes.decode("utf-8", errors="ignore")
         params = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
         if gacha_type is None or params.get("default_gacha_type", [None])[-1] == str(gacha_type):
-            return {key: values[-1] for key, values in params.items()}
+            result = {key: values[-1] for key, values in params.items()}
+            parsed_url = urllib.parse.urlsplit(url)
+            result["_endpoint"] = urllib.parse.urlunsplit(
+                (parsed_url.scheme, parsed_url.netloc, parsed_url.path, "", "")
+            )
+            return result
     return {}
 
 
