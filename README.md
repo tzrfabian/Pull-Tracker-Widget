@@ -27,17 +27,29 @@ python -m venv .venv
 
 1. Select the game tab.
 2. Open that game and open its character event or signal search history.
-3. Leave the history available, then run the official Star Rail Station PowerShell extractor below.
+3. Leave the history available, then run the extractor for the selected game below.
 4. Paste the URL copied to your clipboard into the widget.
 5. Press **Use Pasted Link**.
 
-The extractor validates the URL with the game API, creates a fresh usable history URL, and copies it to your clipboard:
+The extractors validate the URL with the game API, create a fresh usable history URL, and copy it to your clipboard.
+
+### HSR
+
+Run this while HSR's character event warp history is open:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; Invoke-Expression (New-Object Net.WebClient).DownloadString("https://gist.githubusercontent.com/Star-Rail-Station/2512df54c4f35d399cc9abbde665e8f0/raw/get_warp_link_os.ps1?cachebust=srs")
 ```
 
-This command is for the Windows Star Rail client. It opens the cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
+### ZZZ
+
+Run this while ZZZ's Signal Search history is open:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; Invoke-Expression (New-Object Net.WebClient).DownloadString("https://gist.github.com/Star-Rail-Station/2147c886045beec7cefc301508bd83d3/raw/d0f2ad962539e52ed56bdcf6972943e9cae6d182/get_signal_link_os.ps1")
+```
+
+Each command opens the appropriate game's cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
 
 After a successful load, the URL field is hidden and the widget shows the eight most recent pulls. Click **Submit Link Again** to paste a new history URL.
 
@@ -59,13 +71,14 @@ The widget checks the API every 60 seconds after a pasted link is loaded. If the
 
 ## Current behavior
 
-- Reads HSR character event warp history (`gacha_type=11`) or ZZZ signal search history (`gacha_type=2`), based on the selected tab.
-- Displays pity as pulls since the latest 5-star, up to the 90-pull hard pity limit.
+- Reads HSR character event warp history (`gacha_type=11`) or ZZZ exclusive agent signal search history (`gacha_type=2001`), based on the selected tab.
+- Uses the HSR `api-os-takumi` history endpoint and the ZZZ `public-operation-nap-sg` endpoint, including ZZZ's `game_biz=nap_global` parameter.
+- Displays pity as pulls since the latest highest-rarity pull, up to the 90-pull hard pity limit.
 - Shows all pulls returned by the API after a successful load.
-- Filters recent pulls by rarity, with 4★ and 5★ enabled by default.
-- Color-codes recent pulls by rarity: blue for 3★, purple for 4★, and gold for 5★.
-- Marks the next limited 5-star as guaranteed after a loss to one of the seven standard 5-star characters.
-- Requests only the first 20 history entries. Older history is not searched, so pity and guarantee status can be incomplete when the latest 5-star is not on the first page.
+- Filters recent pulls by rarity, with the two highest rarities enabled by default.
+- Color-codes HSR pulls as blue for 3★, purple for 4★, and gold for 5★. ZZZ API rank types are labeled and colored blue for B Rank (`2`), purple for A Rank (`3`), and gold for S Rank (`4`).
+- Marks the next limited highest-rarity pull as guaranteed after a loss to one of the standard highest-rarity characters.
+- Requests only the first 20 history entries. Older history is not searched, so pity and guarantee status can be incomplete when the latest highest-rarity pull is not on the first page.
 - Shows API or cache errors in the status line.
 
 ## Notes
