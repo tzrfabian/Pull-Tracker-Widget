@@ -27,14 +27,15 @@ def _get_query_params(data, gacha_type=None):
     return {}
 
 
-def get_history_params_from_url(history_url, gacha_type=None):
+def get_history_params_from_url(history_url, gacha_type=None, validate_gacha_type=True):
     parsed_url = urllib.parse.urlsplit(history_url.strip())
     params = urllib.parse.parse_qs(parsed_url.query)
     flattened = {key: values[-1] for key, values in params.items()}
     if not flattened.get("authkey"):
         return {}
     if (
-        gacha_type is not None
+        validate_gacha_type
+        and gacha_type is not None
         and flattened.get("default_gacha_type")
         and flattened.get("default_gacha_type") != str(gacha_type)
     ):

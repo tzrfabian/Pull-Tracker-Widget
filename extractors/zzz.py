@@ -15,8 +15,12 @@ def fetch_pity_data(authkey, banner_config):
     return fetch_api_pity_data(authkey, {**GAME_CONFIG, **banner_config}, params)
 
 
-def fetch_pity_data_from_url(history_url, banner_config):
-    params = get_history_params_from_url(history_url, banner_config["gacha_type"])
+def fetch_pity_data_from_url(history_url, banner_config, allow_gacha_type_mismatch=False):
+    params = get_history_params_from_url(
+        history_url,
+        banner_config["gacha_type"],
+        validate_gacha_type=not allow_gacha_type_mismatch,
+    )
     if not params:
         return {"error": f"Invalid ZZZ {banner_config['label']} URL."}
     params["_endpoint"] = GAME_CONFIG["history_endpoint"]
