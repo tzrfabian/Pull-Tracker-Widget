@@ -1,6 +1,6 @@
 # Pull Tracker Widget
 
-A small, borderless, always-on-top desktop widget for Honkai: Star Rail and Zenless Zone Zero banner pity.
+Desktop Widget tool for help tracking pull history and Pity for gacha games. (Currently supports Honkai: Star Rail and Zenless Zone Zero.)
 
 ## Requirements
 
