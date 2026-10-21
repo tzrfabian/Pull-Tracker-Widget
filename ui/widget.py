@@ -50,7 +50,7 @@ class PullTrackerWidget(ctk.CTk):
         self.game_tabs.set(self.selected_game)
         self.game_tabs.pack(pady=(8, 0))
 
-        self.banner_tabs = ctk.CTkSegmentedButton(
+        self.banner_selector = ctk.CTkOptionMenu(
             self,
             values=[
                 banner_config["label"]
@@ -60,8 +60,8 @@ class PullTrackerWidget(ctk.CTk):
             width=340,
             height=28,
         )
-        self.banner_tabs.set(self.get_selected_config()["label"])
-        self.banner_tabs.pack(pady=(4, 0))
+        self.banner_selector.set(self.get_selected_config()["label"])
+        self.banner_selector.pack(pady=(4, 0))
 
         self.close_button = ctk.CTkButton(
             self,
@@ -138,12 +138,12 @@ class PullTrackerWidget(ctk.CTk):
     def get_selected_config(self):
         return GAME_CONFIGS[self.selected_game]["banners"][self.selected_banner]
 
-    def configure_banner_tabs(self):
+    def configure_banner_selector(self):
         banner_configs = GAME_CONFIGS[self.selected_game]["banners"]
-        self.banner_tabs.configure(
+        self.banner_selector.configure(
             values=[banner_config["label"] for banner_config in banner_configs.values()]
         )
-        self.banner_tabs.set(banner_configs[self.selected_banner]["label"])
+        self.banner_selector.set(banner_configs[self.selected_banner]["label"])
 
     @staticmethod
     def create_game_icon(path):
@@ -178,12 +178,10 @@ class PullTrackerWidget(ctk.CTk):
     def select_game(self):
         self.selected_game = self.game_tabs.get()
         self.selected_banner = self.get_banner_keys()[0]
-        self.configure_banner_tabs()
+        self.configure_banner_selector()
         self.reset_for_selection()
 
-    def select_banner(self, banner_label=None):
-        if banner_label is None:
-            banner_label = self.banner_tabs.get()
+    def select_banner(self, banner_label):
         self.selected_banner = next(
             key
             for key, config in GAME_CONFIGS[self.selected_game]["banners"].items()

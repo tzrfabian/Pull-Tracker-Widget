@@ -25,7 +25,7 @@ python -m venv .venv
 
 ## Setup and refresh
 
-1. Select the game tab and then select the warp or channel to track.
+1. Select the game tab and then choose the warp or channel to track from the gacha type dropdown.
 2. Open that game and open the selected warp or channel's history.
 3. Leave the history available, then run the extractor for the selected game below.
 4. Paste the URL copied to your clipboard into the widget.
@@ -52,7 +52,7 @@ Run this while the selected ZZZ channel history is open:
 Each command opens the appropriate game's cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
 
 After a successful load, the URL field is hidden and the widget shows the eight most recent pulls. Click **Submit Link Again** to paste a new history URL.
-After the first successful submission, switching between warp or channel sub-tabs automatically reloads the selected banner using the saved history link.
+After the first successful submission, switching the warp or channel in the gacha type dropdown automatically reloads the selected banner using the saved history link.
 
 The script looks for the authkey in the cache file below. On newer game versions where that cache file is not present, it also reads the game's `Player.log` beside the `Data` folder.
 
