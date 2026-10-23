@@ -22,25 +22,61 @@ class PullTrackerWidget(ctk.CTk):
 
         self.selected_game = "HSR"
         self.selected_banner = "character_event"
-        self.drag_handle = ctk.CTkFrame(
+        self.minimized = False
+        self.header = ctk.CTkFrame(
             self,
-            width=380,
-            height=12,
+            height=34,
             fg_color="#2b2b32",
             corner_radius=4,
         )
-        self.drag_handle.pack(pady=(6, 0))
-        self.drag_handle.pack_propagate(False)
-        self.drag_handle.bind("<ButtonPress-1>", self.start_move)
-        self.drag_handle.bind("<B1-Motion>", self.do_move)
-        self.drag_handle.bind("<ButtonRelease-1>", self.stop_move)
+        self.header.pack(fill="x", padx=6, pady=(6, 0))
+        self.header.pack_propagate(False)
+        self.header_title = ctk.CTkLabel(
+            self.header,
+            text="Pull Tracker Widget",
+            font=("Arial", 12, "bold"),
+            text_color="#ffffff",
+        )
+        self.header_title.pack(side="left", padx=10)
+
+        self.minimize_button = ctk.CTkButton(
+            self.header,
+            text="—",
+            width=28,
+            height=24,
+            command=self.toggle_minimize,
+            fg_color="transparent",
+            hover_color="#565666",
+            text_color="#ffffff",
+        )
+        self.minimize_button.pack(side="right", padx=(0, 2), pady=5)
+
+        self.close_button = ctk.CTkButton(
+            self.header,
+            text="X",
+            width=28,
+            height=24,
+            command=self.destroy,
+            fg_color="transparent",
+            hover_color="#ff5555",
+            text_color="#ffffff",
+        )
+        self.close_button.pack(side="right", padx=(0, 6), pady=5)
+
+        for drag_widget in (self.header, self.header_title):
+            drag_widget.bind("<ButtonPress-1>", self.start_move)
+            drag_widget.bind("<B1-Motion>", self.do_move)
+            drag_widget.bind("<ButtonRelease-1>", self.stop_move)
+
+        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.content_frame.pack(fill="both", expand=True)
 
         assets_dir = Path(__file__).resolve().parent.parent / "assets"
         self.game_icons = {
             game: self.create_game_icon(assets_dir / f"{game.lower()}_icon.png")
             for game in GAME_CONFIGS
         }
-        self.game_tabs = ctk.CTkTabview(self, width=340, height=42, command=self.select_game)
+        self.game_tabs = ctk.CTkTabview(self.content_frame, width=340, height=42, command=self.select_game)
         for game in GAME_CONFIGS:
             self.game_tabs.add(game)
             self.game_tabs._segmented_button._buttons_dict[game].configure(
@@ -51,7 +87,7 @@ class PullTrackerWidget(ctk.CTk):
         self.game_tabs.pack(pady=(8, 0))
 
         self.banner_selector = ctk.CTkOptionMenu(
-            self,
+            self.content_frame,
             values=[
                 banner_config["label"]
                 for banner_config in GAME_CONFIGS[self.selected_game]["banners"].values()
@@ -63,26 +99,14 @@ class PullTrackerWidget(ctk.CTk):
         self.banner_selector.set(self.get_selected_config()["label"])
         self.banner_selector.pack(pady=(4, 0))
 
-        self.close_button = ctk.CTkButton(
-            self,
-            text="X",
-            width=24,
-            height=24,
-            command=self.destroy,
-            fg_color="#3a3a44",
-            hover_color="#ff5555",
-            text_color="#ffffff",
-        )
-        self.close_button.place(relx=1.0, x=-8, y=8, anchor="ne")
-
-        self.title_label = ctk.CTkLabel(self, text=self.get_selected_config()["title"], font=("Arial", 14, "bold"), text_color="#a0a0b5")
+        self.title_label = ctk.CTkLabel(self.content_frame, text=self.get_selected_config()["title"], font=("Arial", 14, "bold"), text_color="#a0a0b5")
         self.title_label.pack(pady=(10, 0))
 
-        self.pity_label = ctk.CTkLabel(self, text=f"-- / {self.get_selected_config()['hard_pity']}", font=("Arial", 32, "bold"), text_color="#ffffff")
+        self.pity_label = ctk.CTkLabel(self.content_frame, text=f"-- / {self.get_selected_config()['hard_pity']}", font=("Arial", 32, "bold"), text_color="#ffffff")
         self.pity_label.pack()
 
         self.status_label = ctk.CTkLabel(
-            self,
+            self.content_frame,
             text="50/50 status unknown",
             width=400,
             wraplength=400,
@@ -92,24 +116,24 @@ class PullTrackerWidget(ctk.CTk):
         self.status_label.pack(pady=(0, 10))
 
         self.history_url_entry = ctk.CTkEntry(
-            self,
+            self.content_frame,
             width=400,
             placeholder_text="Paste history URL here",
         )
         self.history_url_entry.pack(pady=(0, 6))
 
         self.recent_pulls_frame = ctk.CTkScrollableFrame(
-            self,
+            self.content_frame,
             width=390,
             height=170,
             label_text="Recent pulls",
         )
-        self.filter_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.filter_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.filter_vars = {}
         self.configure_rarity_filters()
 
         self.load_button = ctk.CTkButton(
-            self,
+            self.content_frame,
             text="Use Pasted Link",
             width=150,
             height=28,
@@ -357,11 +381,25 @@ class PullTrackerWidget(ctk.CTk):
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        width = max(420, self.winfo_reqwidth() + 16)
-        height = min(self.winfo_reqheight() + 16, screen_height - 20)
+        if self.minimized:
+            width = max(220, self.header.winfo_reqwidth() + 12)
+            height = self.header.winfo_reqheight() + 12
+        else:
+            width = max(420, self.winfo_reqwidth() + 16)
+            height = min(self.winfo_reqheight() + 16, screen_height - 20)
         x = min(max(0, self.winfo_x()), max(0, screen_width - width))
         y = min(max(0, self.winfo_y()), max(0, screen_height - height))
         self.geometry(f"{width}x{height}+{x}+{y}")
+
+    def toggle_minimize(self):
+        self.minimized = not self.minimized
+        if self.minimized:
+            self.content_frame.pack_forget()
+            self.minimize_button.configure(text="+")
+        else:
+            self.content_frame.pack(fill="both", expand=True)
+            self.minimize_button.configure(text="—")
+        self.adjust_window_size()
 
     def refresh_history(self):
         self.refresh_after_id = None

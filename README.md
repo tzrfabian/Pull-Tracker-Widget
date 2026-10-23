@@ -79,6 +79,7 @@ The widget checks the API every 60 seconds after a pasted link is loaded. If the
 - Filters recent pulls by rarity, with the two highest rarities enabled by default.
 - Color-codes HSR pulls as blue for 3★, purple for 4★, and gold for 5★. ZZZ API rank types are labeled and colored blue for B Rank (`2`), purple for A Rank (`3`), and gold for S Rank (`4`).
 - Marks the next limited highest-rarity pull as guaranteed after a loss to one of the standard highest-rarity characters.
+- Uses the header to drag the widget, minimize the content, or close the widget. Click the minimize button again to restore the content.
 - Requests only the first 20 history entries. Older history is not searched, so pity and guarantee status can be incomplete when the latest highest-rarity pull is not on the first page.
 - Shows API or cache errors in the status line.
 
