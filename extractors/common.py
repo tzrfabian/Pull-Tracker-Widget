@@ -1,6 +1,10 @@
+import logging
 import os
 import re
 import urllib.parse
+
+
+logger = logging.getLogger(__name__)
 
 
 def _source_paths(cache_path):
@@ -49,16 +53,21 @@ def get_history_params_from_url(history_url, gacha_type=None, validate_gacha_typ
 def get_history_params_from_cache(cache_path, gacha_type=None):
     for source_path in _source_paths(cache_path):
         if not os.path.exists(source_path):
+            logger.debug("History source does not exist: %s", source_path)
             continue
 
         try:
+            logger.debug("Scanning history source: %s gacha_type=%s", source_path, gacha_type)
             with open(source_path, "rb") as source_file:
                 params = _get_query_params(source_file.read(), gacha_type)
             if params.get("authkey"):
+                logger.info("Found history parameters in: %s", source_path)
                 return params
+            logger.debug("No matching history parameters found in: %s", source_path)
         except (OSError, UnicodeError) as error:
-            print(f"Error reading authkey source: {error}")
+            logger.exception("Error reading history source: %s", source_path)
 
+    logger.warning("No history parameters found: cache_path=%s gacha_type=%s", cache_path, gacha_type)
     return {}
 
 
