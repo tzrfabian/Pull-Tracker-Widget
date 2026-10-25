@@ -1,4 +1,7 @@
+import logging
+import subprocess
 import threading
+import urllib.parse
 from pathlib import Path
 
 import customtkinter as ctk
@@ -7,6 +10,9 @@ from PIL import Image
 
 from config import GAME_CONFIGS
 from extractors import EXTRACTORS
+
+
+logger = logging.getLogger(__name__)
 
 
 class PullTrackerWidget(ctk.CTk):
@@ -120,7 +126,29 @@ class PullTrackerWidget(ctk.CTk):
             width=400,
             placeholder_text="Paste history URL here",
         )
-        self.history_url_entry.pack(pady=(0, 6))
+        self.load_button = ctk.CTkButton(
+            self.content_frame,
+            text="Load from Game",
+            width=180,
+            height=28,
+            command=self.load_history,
+            fg_color="#3a3a44",
+            hover_color="#565666",
+            text_color="#ffffff",
+        )
+        self.load_button.pack(pady=(0, 4))
+
+        self.pasted_load_button = ctk.CTkButton(
+            self.content_frame,
+            text="Use Pasted Link",
+            width=180,
+            height=28,
+            command=self.handle_pasted_link,
+            fg_color="transparent",
+            hover_color="#565666",
+            text_color="#ffffff",
+        )
+        self.pasted_load_button.pack(pady=(0, 6))
 
         self.recent_pulls_frame = ctk.CTkScrollableFrame(
             self.content_frame,
@@ -132,22 +160,11 @@ class PullTrackerWidget(ctk.CTk):
         self.filter_vars = {}
         self.configure_rarity_filters()
 
-        self.load_button = ctk.CTkButton(
-            self.content_frame,
-            text="Use Pasted Link",
-            width=150,
-            height=28,
-            command=self.use_pasted_link,
-            fg_color="#3a3a44",
-            hover_color="#565666",
-            text_color="#ffffff",
-        )
-        self.load_button.pack(pady=(0, 10))
-
         self.loading = False
         self.refresh_after_id = None
         self.recent_pulls = []
         self.history_urls = {}
+        self.history_sources = {}
         self.dragging = False
 
         for drag_widget in (self.title_label, self.pity_label, self.status_label):
@@ -202,6 +219,7 @@ class PullTrackerWidget(ctk.CTk):
     def select_game(self):
         self.selected_game = self.game_tabs.get()
         self.selected_banner = self.get_banner_keys()[0]
+        logger.debug("Selected game=%s banner=%s", self.selected_game, self.selected_banner)
         self.configure_banner_selector()
         self.reset_for_selection()
 
@@ -211,6 +229,7 @@ class PullTrackerWidget(ctk.CTk):
             for key, config in GAME_CONFIGS[self.selected_game]["banners"].items()
             if config["label"] == banner_label
         )
+        logger.debug("Selected game=%s banner=%s", self.selected_game, self.selected_banner)
         self.reset_for_selection()
 
     def reset_for_selection(self):
@@ -221,8 +240,9 @@ class PullTrackerWidget(ctk.CTk):
         self.recent_pulls_frame.pack_forget()
         self.filter_frame.pack_forget()
         self.configure_rarity_filters()
-        self.history_url_entry.pack(pady=(0, 6))
-        self.load_button.configure(state="normal", text="Use Pasted Link", command=self.use_pasted_link)
+        self.history_url_entry.pack_forget()
+        self.load_button.configure(state="normal", text="Load from Game", command=self.load_history)
+        self.pasted_load_button.configure(state="normal", text="Use Pasted Link", command=self.handle_pasted_link)
         self.loading = False
         if self.refresh_after_id is not None:
             self.after_cancel(self.refresh_after_id)
@@ -238,18 +258,23 @@ class PullTrackerWidget(ctk.CTk):
 
     def load_history(self):
         if self.loading:
+            logger.debug("Ignoring local load request because another load is active")
             return
 
+        logger.info("Starting PowerShell history load: game=%s banner=%s", self.selected_game, self.selected_banner)
         self.loading = True
         self.load_button.configure(state="disabled", text="Loading...")
-        self.status_label.configure(text="Reading pull history...", text_color="#a0a0b5")
+        self.pasted_load_button.configure(state="disabled")
+        self.status_label.configure(text="Running extractor in PowerShell...", text_color="#a0a0b5")
         game = self.selected_game
         banner = self.selected_banner
-        threading.Thread(target=self.fetch_history, args=(game, banner), daemon=True).start()
+        self.history_sources[game] = "powershell"
+        threading.Thread(target=self.fetch_history_from_powershell, args=(game, banner), daemon=True).start()
 
     def use_pasted_link(self):
         history_url = self.history_url_entry.get().strip() or self.history_urls.get(self.selected_game, "")
         if not history_url:
+            logger.warning("Pasted-link load requested without a history URL")
             self.status_label.configure(text="Paste the in-game history URL first.", text_color="#ff5555")
             return
         if self.loading:
@@ -259,12 +284,22 @@ class PullTrackerWidget(ctk.CTk):
 
     def start_pasted_history(self, history_url, status_text, allow_gacha_type_mismatch=False):
         if self.loading:
+            logger.debug("Ignoring pasted-link request because another load is active")
             return
+
+        logger.info(
+            "Starting pasted history load: game=%s banner=%s allow_gacha_type_mismatch=%s",
+            self.selected_game,
+            self.selected_banner,
+            allow_gacha_type_mismatch,
+        )
         self.loading = True
         self.load_button.configure(state="disabled", text="Loading...")
+        self.pasted_load_button.configure(state="disabled")
         self.status_label.configure(text=status_text, text_color="#a0a0b5")
         game = self.selected_game
         banner = self.selected_banner
+        self.history_sources[game] = "pasted"
         threading.Thread(
             target=self.fetch_pasted_history,
             args=(game, banner, history_url, allow_gacha_type_mismatch),
@@ -274,6 +309,7 @@ class PullTrackerWidget(ctk.CTk):
     def fetch_pasted_history(self, game, banner, history_url, allow_gacha_type_mismatch=False):
         extractor = EXTRACTORS[game]
         banner_config = GAME_CONFIGS[game]["banners"][banner]
+        logger.debug("Reading pasted history with extractor: game=%s banner=%s", game, banner)
         try:
             result = extractor.fetch_pity_data_from_url(
                 history_url,
@@ -281,33 +317,96 @@ class PullTrackerWidget(ctk.CTk):
                 allow_gacha_type_mismatch=allow_gacha_type_mismatch,
             )
         except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
+            logger.exception("Pasted history load failed: game=%s banner=%s", game, banner)
             result = {"error": f"Unable to load history: {error}"}
+        logger.debug("Pasted history worker completed: game=%s success=%s", game, "error" not in result)
         self.after(0, self.show_history_result, game, banner, result, history_url)
 
     def fetch_history(self, game, banner):
         banner_config = GAME_CONFIGS[game]["banners"][banner]
         extractor = EXTRACTORS[game]
+        logger.debug("Reading local game history source: game=%s banner=%s", game, banner)
 
         try:
             authkey = extractor.get_authkey(banner_config)
             if not authkey:
+                logger.warning("No authkey found in local game sources: game=%s banner=%s", game, banner)
                 result = {"error": "History source not found. Reopen in-game history."}
             else:
+                logger.debug("Authkey found; requesting history API: game=%s banner=%s", game, banner)
                 result = extractor.fetch_pity_data(authkey, banner_config)
         except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
+            logger.exception("Local history load failed: game=%s banner=%s", game, banner)
             result = {"error": f"Unable to load history: {error}"}
 
+        logger.debug("Local history worker completed: game=%s success=%s", game, "error" not in result)
         self.after(0, self.show_history_result, game, banner, result)
+
+    def fetch_history_from_powershell(self, game, banner):
+        extractor_config = GAME_CONFIGS[game]
+        banner_config = extractor_config["banners"][banner]
+        command = extractor_config["extractor_command"]
+        try:
+            logger.info("Launching visible PowerShell extractor: game=%s banner=%s", game, banner)
+            subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    command,
+                ],
+                check=True,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+            clipboard_result = subprocess.run(
+                ["powershell.exe", "-NoProfile", "-Command", "Get-Clipboard -Raw"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            history_url = clipboard_result.stdout.strip()
+            parsed_url = urllib.parse.urlsplit(history_url)
+            query = urllib.parse.parse_qs(parsed_url.query)
+            if not parsed_url.scheme or not parsed_url.netloc or not query.get("authkey"):
+                raise ValueError("PowerShell did not copy a valid history URL to the clipboard.")
+            logger.info("PowerShell copied a valid history URL: game=%s banner=%s", game, banner)
+            result = EXTRACTORS[game].fetch_pity_data_from_url(history_url, banner_config)
+        except (
+            OSError,
+            subprocess.SubprocessError,
+            requests.RequestException,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as error:
+            logger.exception("PowerShell history load failed: game=%s banner=%s", game, banner)
+            result = {"error": f"Unable to load history from PowerShell: {error}"}
+
+        logger.debug("PowerShell history worker completed: game=%s success=%s", game, "error" not in result)
+        self.after(0, self.show_history_result, game, banner, result, history_url if "history_url" in locals() else None)
 
     def show_history_result(self, game, banner, data, history_url=None):
         if game != self.selected_game or banner != self.selected_banner:
+            logger.debug(
+                "Ignoring stale history result: result=%s/%s current=%s/%s",
+                game,
+                banner,
+                self.selected_game,
+                self.selected_banner,
+            )
             return
 
+        logger.debug("Displaying history result: game=%s banner=%s success=%s", game, banner, "error" not in data)
         config = self.get_selected_config()
         self.loading = False
-        self.load_button.configure(state="normal", text="Use Pasted Link")
+        self.load_button.configure(state="normal", text="Load from Game", command=self.load_history)
+        self.pasted_load_button.configure(state="normal", text="Use Pasted Link", command=self.handle_pasted_link)
 
         if "error" in data:
+            logger.error("History load returned an error: game=%s banner=%s error=%s", game, banner, data["error"])
             self.status_label.configure(text=data["error"], text_color="#ff5555")
         else:
             if history_url:
@@ -325,7 +424,8 @@ class PullTrackerWidget(ctk.CTk):
             self.history_url_entry.pack_forget()
             self.filter_frame.pack(pady=(0, 4))
             self.recent_pulls_frame.pack(pady=(0, 6))
-            self.load_button.configure(text="Submit Link Again", command=self.show_link_input)
+            self.load_button.configure(text="Load from Game", command=self.load_history)
+            self.pasted_load_button.configure(text="Use Pasted Link", command=self.handle_pasted_link)
             self.adjust_window_size()
 
         self.refresh_after_id = self.after(60000, self.refresh_history)
@@ -373,9 +473,20 @@ class PullTrackerWidget(ctk.CTk):
         self.recent_pulls_frame.pack_forget()
         self.filter_frame.pack_forget()
         self.history_url_entry.pack(pady=(0, 6))
-        self.load_button.configure(text="Use Pasted Link", command=self.use_pasted_link)
+        self.load_button.configure(text="Load from Game", command=self.load_history)
+        self.pasted_load_button.configure(
+            state="normal",
+            text="Use Pasted Link",
+            command=self.use_pasted_link,
+        )
         self.status_label.configure(text="Paste a new history URL.", text_color="#a0a0b5")
         self.adjust_window_size()
+
+    def handle_pasted_link(self):
+        if self.history_url_entry.winfo_manager():
+            self.use_pasted_link()
+        else:
+            self.show_link_input()
 
     def adjust_window_size(self):
         self.update_idletasks()
@@ -403,7 +514,11 @@ class PullTrackerWidget(ctk.CTk):
 
     def refresh_history(self):
         self.refresh_after_id = None
-        self.use_pasted_link()
+        logger.debug("Refreshing history: game=%s source=%s", self.selected_game, self.history_sources.get(self.selected_game))
+        if self.history_sources.get(self.selected_game) in {"local", "powershell"}:
+            self.load_history()
+        else:
+            self.use_pasted_link()
 
     def start_move(self, event):
         self.dragging = True
