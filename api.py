@@ -19,7 +19,7 @@ def fetch_pity_data(authkey, config, history_params=None):
         "lang": history_params.get("lang", "en"),
         "authkey": authkey,
         "gacha_id": history_params.get("gacha_id") or config.get("gacha_id"),
-        "game_biz": config.get("game_biz"),
+        "game_biz": config.get("game_biz") or history_params.get("game_biz"),
         "gacha_type": config["gacha_type"],
         "default_gacha_type": config["gacha_type"],
         "timestamp": int(time.time()),

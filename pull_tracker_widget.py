@@ -8,6 +8,7 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger(__name__).debug("Starting Pull Tracker Widget")
     app = PullTrackerWidget()
     app.mainloop()
