@@ -4,6 +4,7 @@ GAME_CONFIGS = {
         "gacha_id": "dbebc8d9fbb0d4ffa067423482ce505bc5ea",
         "region": "prod_official_asia",
         "history_endpoint": "https://api-os-takumi.mihoyo.com/common/gacha_record/api/getGachaLog",
+        "extractor_command": '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; Invoke-Expression (New-Object Net.WebClient).DownloadString("https://gist.githubusercontent.com/Star-Rail-Station/2512df54c4f35d399cc9abbde665e8f0/raw/get_warp_link_os.ps1?cachebust=srs")',
         "banners": {
             "character_event": {
                 "label": "Character Event Warp",
@@ -95,6 +96,7 @@ GAME_CONFIGS = {
         "cache_path": r"AppData\LocalLow\miHoYo\ZenlessZoneZero\Data\webCaches\Cache\Cache_Data\data_2",
         "game_biz": "nap_global",
         "history_endpoint": "https://public-operation-nap-sg.hoyoverse.com/common/gacha_record/api/getGachaLog",
+        "extractor_command": '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; Invoke-Expression (New-Object Net.WebClient).DownloadString("https://gist.github.com/Star-Rail-Station/2147c886045beec7cefc301508bd83d3/raw/d0f2ad962539e52ed56bdcf6972943e9cae6d182/get_signal_link_os.ps1")',
         "banners": {
             "exclusive": {
                 "label": "Exclusive Channel",
