@@ -27,11 +27,10 @@ python -m venv .venv
 
 1. Select the game tab and then choose the warp or channel to track from the gacha type dropdown.
 2. Open that game and open the selected warp or channel's history.
-3. Leave the history available, then run the extractor for the selected game below.
-4. Paste the URL copied to your clipboard into the widget.
-5. Press **Use Pasted Link**.
+3. Click **Load from Game** in the widget. The widget opens PowerShell, runs the extractor for the selected game, reads the copied history URL, and loads the data automatically.
+4. To enter a URL manually, click **Use Pasted Link** to reveal the URL field.
 
-The extractors validate the URL with the game API, create a fresh usable history URL, and copy it to your clipboard.
+The widget validates the URL with the game API after PowerShell copies it to the clipboard.
 
 ### HSR
 
@@ -51,7 +50,7 @@ Run this while the selected ZZZ channel history is open:
 
 Each command opens the appropriate game's cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
 
-After a successful load, the URL field is hidden and the widget shows the eight most recent pulls. Click **Submit Link Again** to paste a new history URL.
+The URL field is hidden by default. After a successful load, the widget shows the eight most recent pulls. Click **Load from Game** again to rerun PowerShell, or click **Use Pasted Link** to reveal the URL field.
 After the first successful submission, switching the warp or channel in the gacha type dropdown automatically reloads the selected banner using the saved history link.
 
 The script looks for the authkey in the cache file below. On newer game versions where that cache file is not present, it also reads the game's `Player.log` beside the `Data` folder.
@@ -68,7 +67,7 @@ ZZZ:
 %USERPROFILE%\AppData\LocalLow\miHoYo\ZenlessZoneZero\Data\webCaches\Cache\Cache_Data\data_2
 ```
 
-The widget checks the API every 60 seconds after a pasted link is loaded. If the link expires, run the extractor again and paste the new URL.
+The widget checks the API every 60 seconds after a history is loaded. PowerShell is rerun on each refresh to obtain a fresh URL.
 
 ## Current behavior
 
@@ -85,7 +84,17 @@ The widget checks the API every 60 seconds after a pasted link is loaded. If the
 
 ## Notes
 
-The widget uses the pasted URL and the official HoYoverse API endpoint. The extractor is an external PowerShell script maintained by Star Rail Station; review it before running if you prefer not to execute downloaded scripts.
+The widget opens PowerShell and downloads the external extractor maintained by Star Rail Station. Review the script before using this workflow if you prefer not to execute downloaded scripts.
+
+## Debug logs
+
+Run the widget from PowerShell to see timestamped debug output:
+
+```powershell
+.venv\Scripts\python.exe pull_tracker_widget.py
+```
+
+The log shows the selected game and banner, PowerShell launch, API request results, pull counts, and full exception details when a load fails. Temporary auth keys and pasted URLs are not printed.
 
 ## Project layout
 
