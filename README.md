@@ -106,4 +106,7 @@ config.py                      Game settings
 api.py                         Shared pity API client
 extractors/                    Game-specific cache readers
 ui/widget.py                   CustomTkinter interface
+ui/game_ui.py                  Shared game UI adapter interface
+ui/hsr.py                      Honkai: Star Rail UI
+ui/zzz.py                      Zenless Zone Zero UI
 ```

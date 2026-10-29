@@ -10,9 +10,16 @@ from PIL import Image
 
 from config import GAME_CONFIGS
 from extractors import EXTRACTORS
+from ui.hsr import HSRUI
+from ui.zzz import ZZZUI
 
 
 logger = logging.getLogger(__name__)
+
+GAME_UIS = {
+    "HSR": HSRUI,
+    "ZZZ": ZZZUI,
+}
 
 
 class PullTrackerWidget(ctk.CTk):
@@ -28,6 +35,7 @@ class PullTrackerWidget(ctk.CTk):
 
         self.selected_game = "HSR"
         self.selected_banner = "character_event"
+        self.game_ui = GAME_UIS[self.selected_game](self)
         self.minimized = False
         self.header = ctk.CTkFrame(
             self,
@@ -201,25 +209,12 @@ class PullTrackerWidget(ctk.CTk):
         return ctk.CTkImage(light_image=canvas, dark_image=canvas, size=(22, 22))
 
     def configure_rarity_filters(self):
-        for child in self.filter_frame.winfo_children():
-            child.destroy()
-
-        self.filter_vars = {}
-        for rarity, rarity_config in self.get_selected_config()["rarities"].items():
-            self.filter_vars[rarity] = ctk.BooleanVar(value=rarity_config["enabled"])
-            checkbox = ctk.CTkCheckBox(
-                self.filter_frame,
-                text=rarity_config["label"],
-                variable=self.filter_vars[rarity],
-                command=self.apply_pull_filters,
-                text_color=rarity_config["color"],
-                width=72,
-            )
-            checkbox.pack(side="left", padx=4)
+        self.game_ui.configure_rarity_filters()
 
     def select_game(self):
         self.selected_game = self.game_tabs.get()
         self.selected_banner = self.get_banner_keys()[0]
+        self.game_ui = GAME_UIS[self.selected_game](self)
         logger.debug("Selected game=%s banner=%s", self.selected_game, self.selected_banner)
         self.configure_banner_selector()
         self.reset_for_selection()
@@ -432,27 +427,7 @@ class PullTrackerWidget(ctk.CTk):
         self.refresh_after_id = self.after(60000, self.refresh_history)
 
     def show_recent_pulls(self, pulls):
-        for child in self.recent_pulls_frame.winfo_children():
-            child.destroy()
-
-        rarity_configs = self.get_selected_config()["rarities"]
-        for pull in pulls:
-            rarity_config = rarity_configs.get(str(pull["rank_type"]))
-            rank = rarity_config["label"] if rarity_config else str(pull["rank_type"])
-            label = ctk.CTkLabel(
-                self.recent_pulls_frame,
-                text=f"{pull['time']}  {rank}  {pull['name']}",
-                anchor="w",
-                text_color=rarity_config["color"] if rarity_config else "#ffffff",
-            )
-            label.pack(fill="x", padx=4, pady=1)
-
-        if not pulls:
-            ctk.CTkLabel(
-                self.recent_pulls_frame,
-                text="No pulls match the selected filters.",
-                text_color="#a0a0b5",
-            ).pack(pady=8)
+        self.game_ui.show_recent_pulls(pulls)
 
     def apply_pull_filters(self):
         self.show_recent_pulls(self.get_filtered_pulls())
