@@ -45,17 +45,6 @@ class PullTrackerWidget(ctk.CTk):
         )
         self.header_title.pack(side="left", padx=10)
 
-        self.minimize_button = ctk.CTkButton(
-            self.header,
-            text="—",
-            width=28,
-            height=24,
-            command=self.toggle_minimize,
-            fg_color="transparent",
-            hover_color="#565666",
-            text_color="#ffffff",
-        )
-        self.minimize_button.pack(side="right", padx=(0, 2), pady=5)
 
         self.close_button = ctk.CTkButton(
             self.header,
@@ -68,6 +57,18 @@ class PullTrackerWidget(ctk.CTk):
             text_color="#ffffff",
         )
         self.close_button.pack(side="right", padx=(0, 6), pady=5)
+        
+        self.minimize_button = ctk.CTkButton(
+            self.header,
+            text="—",
+            width=28,
+            height=24,
+            command=self.toggle_minimize,
+            fg_color="transparent",
+            hover_color="#565666",
+            text_color="#ffffff",
+        )
+        self.minimize_button.pack(side="right", padx=(0, 2), pady=5)
 
         for drag_widget in (self.header, self.header_title):
             drag_widget.bind("<ButtonPress-1>", self.start_move)
@@ -506,7 +507,7 @@ class PullTrackerWidget(ctk.CTk):
         self.minimized = not self.minimized
         if self.minimized:
             self.content_frame.pack_forget()
-            self.minimize_button.configure(text="+")
+            self.minimize_button.configure(text="⤢")
         else:
             self.content_frame.pack(fill="both", expand=True)
             self.minimize_button.configure(text="—")
