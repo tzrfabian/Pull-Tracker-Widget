@@ -31,16 +31,16 @@ class PullTrackerWidget(ctk.CTk):
         self.overrideredirect(True)
         self.attributes("-topmost", True)
         self.attributes("-alpha", 0.88)
-        self.configure(fg_color="#1e1e24")
-
         self.selected_game = "HSR"
         self.selected_banner = "character_event"
         self.game_ui = GAME_UIS[self.selected_game](self)
+        theme = self.get_theme()
+        self.configure(fg_color=theme["background"])
         self.minimized = False
         self.header = ctk.CTkFrame(
             self,
             height=34,
-            fg_color="#2b2b32",
+            fg_color=theme["surface"],
             corner_radius=4,
         )
         self.header.pack(fill="x", padx=6, pady=(6, 0))
@@ -49,7 +49,7 @@ class PullTrackerWidget(ctk.CTk):
             self.header,
             text="Pull Tracker Widget",
             font=("Arial", 12, "bold"),
-            text_color="#ffffff",
+            text_color=theme["text"],
         )
         self.header_title.pack(side="left", padx=10)
 
@@ -61,8 +61,8 @@ class PullTrackerWidget(ctk.CTk):
             height=24,
             command=self.destroy,
             fg_color="transparent",
-            hover_color="#ff5555",
-            text_color="#ffffff",
+            hover_color=theme["error"],
+            text_color=theme["text"],
         )
         self.close_button.pack(side="right", padx=(0, 6), pady=5)
         
@@ -73,8 +73,8 @@ class PullTrackerWidget(ctk.CTk):
             height=24,
             command=self.toggle_minimize,
             fg_color="transparent",
-            hover_color="#565666",
-            text_color="#ffffff",
+            hover_color=theme["surface_alt"],
+            text_color=theme["text"],
         )
         self.minimize_button.pack(side="right", padx=(0, 2), pady=5)
 
@@ -114,10 +114,10 @@ class PullTrackerWidget(ctk.CTk):
         self.banner_selector.set(self.get_selected_config()["label"])
         self.banner_selector.pack(pady=(4, 0))
 
-        self.title_label = ctk.CTkLabel(self.content_frame, text=self.get_selected_config()["title"], font=("Arial", 14, "bold"), text_color="#a0a0b5")
+        self.title_label = ctk.CTkLabel(self.content_frame, text=self.get_selected_config()["title"], font=("Arial", 14, "bold"), text_color=theme["muted"])
         self.title_label.pack(pady=(10, 0))
 
-        self.pity_label = ctk.CTkLabel(self.content_frame, text=f"-- / {self.get_selected_config()['hard_pity']}", font=("Arial", 32, "bold"), text_color="#ffffff")
+        self.pity_label = ctk.CTkLabel(self.content_frame, text=f"-- / {self.get_selected_config()['hard_pity']}", font=("Arial", 32, "bold"), text_color=theme["text"])
         self.pity_label.pack()
 
         self.status_label = ctk.CTkLabel(
@@ -126,7 +126,7 @@ class PullTrackerWidget(ctk.CTk):
             width=400,
             wraplength=400,
             font=("Arial", 12),
-            text_color="#f0c05a",
+            text_color=theme["secondary"],
         )
         self.status_label.pack(pady=(0, 10))
 
@@ -141,9 +141,9 @@ class PullTrackerWidget(ctk.CTk):
             width=180,
             height=28,
             command=self.load_history,
-            fg_color="#3a3a44",
-            hover_color="#565666",
-            text_color="#ffffff",
+            fg_color=theme["accent"],
+            hover_color=theme["accent_hover"],
+            text_color=theme["text"],
         )
         self.load_button.pack(pady=(0, 4))
 
@@ -154,8 +154,8 @@ class PullTrackerWidget(ctk.CTk):
             height=28,
             command=self.handle_pasted_link,
             fg_color="transparent",
-            hover_color="#565666",
-            text_color="#ffffff",
+            hover_color=theme["surface_alt"],
+            text_color=theme["text"],
         )
         self.pasted_load_button.pack(pady=(0, 6))
 
@@ -175,6 +175,7 @@ class PullTrackerWidget(ctk.CTk):
         self.history_urls = {}
         self.history_sources = {}
         self.dragging = False
+        self.apply_game_theme()
 
         for drag_widget in (self.title_label, self.pity_label, self.status_label):
             drag_widget.bind("<ButtonPress-1>", self.start_move)
@@ -187,6 +188,68 @@ class PullTrackerWidget(ctk.CTk):
 
     def get_selected_config(self):
         return GAME_CONFIGS[self.selected_game]["banners"][self.selected_banner]
+
+    def get_theme(self):
+        return GAME_CONFIGS[self.selected_game]["theme"]
+
+    def get_rarity_color(self, rarity, fallback):
+        return self.get_theme()["rarities"].get(str(rarity), fallback)
+
+    def apply_game_theme(self):
+        theme = self.get_theme()
+        self.configure(fg_color=theme["background"])
+        self.header.configure(fg_color=theme["surface"])
+        self.header_title.configure(text_color=theme["text"])
+        self.close_button.configure(
+            hover_color=theme["error"],
+            text_color=theme["text"],
+        )
+        self.minimize_button.configure(
+            hover_color=theme["surface_alt"],
+            text_color=theme["text"],
+        )
+        self.game_tabs.configure(
+            fg_color=theme["background"],
+            segmented_button_fg_color=theme["surface"],
+            segmented_button_selected_color=theme["accent"],
+            segmented_button_selected_hover_color=theme["accent_hover"],
+            text_color=theme["text"],
+        )
+        for button in self.game_tabs._segmented_button._buttons_dict.values():
+            button.configure(
+                fg_color=theme["surface"],
+                hover_color=theme["surface_alt"],
+                text_color=theme["text"],
+            )
+        self.banner_selector.configure(
+            fg_color=theme["surface"],
+            button_color=theme["accent"],
+            button_hover_color=theme["accent_hover"],
+            text_color=theme["text"],
+        )
+        self.title_label.configure(text_color=theme["muted"])
+        self.pity_label.configure(text_color=theme["text"])
+        self.status_label.configure(text_color=theme["muted"])
+        self.history_url_entry.configure(
+            fg_color=theme["surface"],
+            border_color=theme["accent"],
+            text_color=theme["text"],
+            placeholder_text_color=theme["muted"],
+        )
+        self.load_button.configure(
+            fg_color=theme["accent"],
+            hover_color=theme["accent_hover"],
+            text_color=theme["text"],
+        )
+        self.pasted_load_button.configure(
+            hover_color=theme["surface_alt"],
+            text_color=theme["text"],
+        )
+        self.recent_pulls_frame.configure(
+            fg_color=theme["surface"],
+            label_fg_color=theme["surface_alt"],
+            label_text_color=theme["text"],
+        )
 
     def configure_banner_selector(self):
         banner_configs = GAME_CONFIGS[self.selected_game]["banners"]
@@ -216,6 +279,7 @@ class PullTrackerWidget(ctk.CTk):
         self.selected_banner = self.get_banner_keys()[0]
         self.game_ui = GAME_UIS[self.selected_game](self)
         logger.debug("Selected game=%s banner=%s", self.selected_game, self.selected_banner)
+        self.apply_game_theme()
         self.configure_banner_selector()
         self.reset_for_selection()
 
@@ -232,7 +296,10 @@ class PullTrackerWidget(ctk.CTk):
         config = self.get_selected_config()
         self.title_label.configure(text=config["title"])
         self.pity_label.configure(text=f"-- / {config['hard_pity']}")
-        self.status_label.configure(text="Don't forget open in-game history first", text_color="#ff5555")
+        self.status_label.configure(
+            text="Don't forget open in-game history first",
+            text_color=self.get_theme()["error"],
+        )
         self.recent_pulls_frame.pack_forget()
         self.filter_frame.pack_forget()
         self.configure_rarity_filters()
@@ -261,7 +328,10 @@ class PullTrackerWidget(ctk.CTk):
         self.loading = True
         self.load_button.configure(state="disabled", text="Loading...")
         self.pasted_load_button.configure(state="disabled")
-        self.status_label.configure(text="Running extractor in PowerShell...", text_color="#a0a0b5")
+        self.status_label.configure(
+            text="Running extractor in PowerShell...",
+            text_color=self.get_theme()["muted"],
+        )
         game = self.selected_game
         banner = self.selected_banner
         self.history_sources[game] = "powershell"
@@ -271,7 +341,10 @@ class PullTrackerWidget(ctk.CTk):
         history_url = self.history_url_entry.get().strip() or self.history_urls.get(self.selected_game, "")
         if not history_url:
             logger.warning("Pasted-link load requested without a history URL")
-            self.status_label.configure(text="Paste the in-game history URL first.", text_color="#ff5555")
+            self.status_label.configure(
+                text="Paste the in-game history URL first.",
+                text_color=self.get_theme()["error"],
+            )
             return
         if self.loading:
             return
@@ -292,7 +365,7 @@ class PullTrackerWidget(ctk.CTk):
         self.loading = True
         self.load_button.configure(state="disabled", text="Loading...")
         self.pasted_load_button.configure(state="disabled")
-        self.status_label.configure(text=status_text, text_color="#a0a0b5")
+        self.status_label.configure(text=status_text, text_color=self.get_theme()["muted"])
         game = self.selected_game
         banner = self.selected_banner
         self.history_sources[game] = "pasted"
@@ -403,7 +476,10 @@ class PullTrackerWidget(ctk.CTk):
 
         if "error" in data:
             logger.error("History load returned an error: game=%s banner=%s error=%s", game, banner, data["error"])
-            self.status_label.configure(text=data["error"], text_color="#ff5555")
+            self.status_label.configure(
+                text=data["error"],
+                text_color=self.get_theme()["error"],
+            )
         else:
             if history_url:
                 self.history_urls[game] = history_url
@@ -413,7 +489,11 @@ class PullTrackerWidget(ctk.CTk):
                 if data["guaranteed"]
                 else f"Next {config['highest_rarity_label']} is a 50/50"
             )
-            color = "#55ff55" if data["guaranteed"] else "#f0c05a"
+            color = (
+                self.get_theme()["success"]
+                if data["guaranteed"]
+                else self.get_theme()["secondary"]
+            )
             self.status_label.configure(text=status_text, text_color=color)
             self.recent_pulls = data["recent_pulls"]
             self.show_recent_pulls(self.get_filtered_pulls())
@@ -455,7 +535,10 @@ class PullTrackerWidget(ctk.CTk):
             text="Use Pasted Link",
             command=self.use_pasted_link,
         )
-        self.status_label.configure(text="Paste a new history URL.", text_color="#a0a0b5")
+        self.status_label.configure(
+            text="Paste a new history URL.",
+            text_color=self.get_theme()["muted"],
+        )
         self.adjust_window_size()
 
     def handle_pasted_link(self):

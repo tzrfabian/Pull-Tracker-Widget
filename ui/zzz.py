@@ -17,7 +17,7 @@ class ZZZUI(GameUI):
                 text=rarity_config["label"],
                 variable=widget.filter_vars[rarity],
                 command=widget.apply_pull_filters,
-                text_color=rarity_config["color"],
+                text_color=widget.get_rarity_color(rarity, rarity_config["color"]),
                 width=72,
             )
             checkbox.pack(side="left", padx=4)
@@ -35,7 +35,11 @@ class ZZZUI(GameUI):
                 widget.recent_pulls_frame,
                 text=f"{pull['time']}  {rank}  {pull['name']}",
                 anchor="w",
-                text_color=rarity_config["color"] if rarity_config else "#ffffff",
+                text_color=(
+                    widget.get_rarity_color(str(pull["rank_type"]), rarity_config["color"])
+                    if rarity_config
+                    else widget.get_theme()["text"]
+                ),
             )
             label.pack(fill="x", padx=4, pady=1)
 
@@ -43,5 +47,5 @@ class ZZZUI(GameUI):
             ctk.CTkLabel(
                 widget.recent_pulls_frame,
                 text="No pulls match the selected filters.",
-                text_color="#a0a0b5",
+                text_color=widget.get_theme()["muted"],
             ).pack(pady=8)
