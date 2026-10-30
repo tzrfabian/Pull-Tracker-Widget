@@ -1,5 +1,18 @@
 GAME_CONFIGS = {
     "HSR": {
+        "theme": {
+            "background": "#171522",
+            "surface": "#252238",
+            "surface_alt": "#302a4a",
+            "accent": "#6f8cff",
+            "accent_hover": "#879eff",
+            "secondary": "#b58bd9",
+            "text": "#f5f2ff",
+            "muted": "#b9b3cc",
+            "success": "#79d6c3",
+            "error": "#ff7b9c",
+            "rarities": {"3": "#6fa8dc", "4": "#b58bd9", "5": "#f0c05a"},
+        },
         "cache_path": r"AppData\LocalLow\Cognosphere\Star Rail\Data\webCaches\Cache\Cache_Data\data_2",
         "gacha_id": "dbebc8d9fbb0d4ffa067423482ce505bc5ea",
         "region": "prod_official_asia",
@@ -93,6 +106,19 @@ GAME_CONFIGS = {
         },
     },
     "ZZZ": {
+        "theme": {
+            "background": "#181818",
+            "surface": "#252525",
+            "surface_alt": "#383838",
+            "accent": "#e87524",
+            "accent_hover": "#ff933f",
+            "secondary": "#ffb347",
+            "text": "#fff4e8",
+            "muted": "#c8b8aa",
+            "success": "#a6d86e",
+            "error": "#ff8066",
+            "rarities": {"2": "#b8b8b8", "3": "#ff9f43", "4": "#ffd166"},
+        },
         "cache_path": r"AppData\LocalLow\miHoYo\ZenlessZoneZero\Data\webCaches\Cache\Cache_Data\data_2",
         "game_biz": "nap_global",
         "history_endpoint": "https://public-operation-nap-sg.hoyoverse.com/common/gacha_record/api/getGachaLog",
