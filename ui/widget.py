@@ -117,6 +117,10 @@ class PullTrackerWidget(ctk.CTk):
         self.title_label = ctk.CTkLabel(self.content_frame, text=self.get_selected_config()["title"], font=("Arial", 14, "bold"), text_color=theme["muted"])
         self.title_label.pack(pady=(10, 0))
 
+        self.statistics_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.stat_value_labels = {}
+        self.configure_statistics()
+
         self.pity_label = ctk.CTkLabel(self.content_frame, text=f"-- / {self.get_selected_config()['hard_pity']}", font=("Arial", 32, "bold"), text_color=theme["text"])
         self.pity_label.pack()
 
@@ -230,6 +234,8 @@ class PullTrackerWidget(ctk.CTk):
         self.title_label.configure(text_color=theme["muted"])
         self.pity_label.configure(text_color=theme["text"])
         self.status_label.configure(text_color=theme["muted"])
+        for value_label in self.stat_value_labels.values():
+            value_label.configure(text_color=theme["accent"])
         self.history_url_entry.configure(
             fg_color=theme["surface"],
             border_color=theme["accent"],
@@ -257,6 +263,65 @@ class PullTrackerWidget(ctk.CTk):
             values=[banner_config["label"] for banner_config in banner_configs.values()]
         )
         self.banner_selector.set(banner_configs[self.selected_banner]["label"])
+
+    def configure_statistics(self):
+        for child in self.statistics_frame.winfo_children():
+            child.destroy()
+
+        config = self.get_selected_config()
+        rarities = config["rarities"]
+        highest_rarity = config["highest_rarity"]
+        second_highest_rarity = next(
+            (rarity for rarity in sorted(rarities, key=int, reverse=True) if rarity != highest_rarity),
+            None,
+        )
+        highest_label = rarities[highest_rarity]["label"]
+        second_highest_label = (
+            rarities[second_highest_rarity]["label"]
+            if second_highest_rarity
+            else "Lower rarity"
+        )
+        labels = [
+            ("total_warps", "Total Warps"),
+            ("currency_spent", f"{GAME_CONFIGS[self.selected_game]['currency_name']} Spent"),
+            ("highest_rarity_count", f"{highest_label} Warps"),
+            ("second_highest_rarity_count", f"{second_highest_label} Warps"),
+            ("average_highest_rarity_pity", f"AVG {highest_label} Pity"),
+            ("average_second_highest_rarity_pity", f"AVG {second_highest_label} Pity"),
+            ("win_rate", "50/50 Win Rate"),
+        ]
+        self.stat_value_labels = {}
+        for row, (key, label) in enumerate(labels):
+            ctk.CTkLabel(
+                self.statistics_frame,
+                text=label,
+                anchor="w",
+                font=("Arial", 12, "bold"),
+                text_color=self.get_theme()["text"],
+            ).grid(row=row, column=0, sticky="w", pady=1)
+            value_label = ctk.CTkLabel(
+                self.statistics_frame,
+                text="--",
+                anchor="e",
+                font=("Arial", 12, "bold"),
+                text_color=self.get_theme()["accent"],
+            )
+            value_label.grid(row=row, column=1, sticky="e", pady=1)
+            self.stat_value_labels[key] = value_label
+        self.statistics_frame.grid_columnconfigure(0, weight=1)
+
+    def update_statistics(self, statistics):
+        for key, value_label in self.stat_value_labels.items():
+            value = statistics.get(key)
+            if value is None:
+                text = "--"
+            elif key == "win_rate":
+                text = f"{value:.2f}%"
+            elif key.startswith("average_"):
+                text = f"{value:g}"
+            else:
+                text = f"{value:,}"
+            value_label.configure(text=text)
 
     @staticmethod
     def create_game_icon(path):
@@ -295,6 +360,8 @@ class PullTrackerWidget(ctk.CTk):
     def reset_for_selection(self):
         config = self.get_selected_config()
         self.title_label.configure(text=config["title"])
+        self.configure_statistics()
+        self.statistics_frame.pack_forget()
         self.pity_label.configure(text=f"-- / {config['hard_pity']}")
         self.status_label.configure(
             text="Don't forget open in-game history first",
@@ -483,7 +550,14 @@ class PullTrackerWidget(ctk.CTk):
         else:
             if history_url:
                 self.history_urls[game] = history_url
+            self.statistics_frame.pack(
+                fill="x",
+                padx=28,
+                pady=(8, 2),
+                before=self.pity_label,
+            )
             self.pity_label.configure(text=f"{data['pity']} / {config['hard_pity']}")
+            self.update_statistics(data["statistics"])
             status_text = (
                 "Guaranteed Limited!"
                 if data["guaranteed"]
