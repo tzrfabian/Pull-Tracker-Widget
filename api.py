@@ -5,6 +5,9 @@ import time
 
 logger = logging.getLogger(__name__)
 
+RATE_LIMIT_RETRIES = 3
+RATE_LIMIT_BACKOFF_SECONDS = 2
+
 
 def _average_pity(pulls, rarity):
     pull_positions = [
@@ -22,7 +25,7 @@ def _average_pity(pulls, rarity):
     return round(sum(pity_values) / len(pity_values), 1)
 
 
-def _get_statistics(pulls, config):
+def calculate_statistics(pulls, config):
     highest_rarity = config["highest_rarity"]
     rarity_values = sorted(
         config.get("rarities", {highest_rarity: {}}),
@@ -70,8 +73,46 @@ def _get_statistics(pulls, config):
     }
 
 
+def _request_history_page(endpoint, params):
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        params["timestamp"] = int(time.time())
+        response = requests.get(endpoint, params=params, timeout=15)
+        response.raise_for_status()
+        payload = response.json()
+        message = str(payload.get("message", "")).lower()
+        if "visit too frequently" not in message:
+            return payload
+
+        if attempt == RATE_LIMIT_RETRIES:
+            logger.warning(
+                "History API rate limit persisted after %s retries: gacha_type=%s page=%s",
+                RATE_LIMIT_RETRIES,
+                params["gacha_type"],
+                params["page"],
+            )
+            return {
+                "error": (
+                    "HoYoverse is temporarily rate-limiting history requests. "
+                    "Wait a few seconds and try again."
+                )
+            }
+
+        delay = RATE_LIMIT_BACKOFF_SECONDS * (attempt + 1)
+        logger.warning(
+            "History API rate-limited request; retrying in %s seconds: gacha_type=%s page=%s",
+            delay,
+            params["gacha_type"],
+            params["page"],
+        )
+        time.sleep(delay)
+
+
 def fetch_pity_data(authkey, config, history_params=None):
     history_params = history_params or {}
+    known_pull_ids = {
+        str(pull_id)
+        for pull_id in history_params.pop("_known_pull_ids", [])
+    }
     endpoint = history_params.pop(
         "_endpoint",
         config["history_endpoint"],
@@ -104,9 +145,9 @@ def fetch_pity_data(authkey, config, history_params=None):
     )
     pulls = []
     while True:
-        response = requests.get(endpoint, params=params, timeout=15)
-        response.raise_for_status()
-        response = response.json()
+        response = _request_history_page(endpoint, params)
+        if "error" in response:
+            return response
         logger.debug(
             "History API response: gacha_type=%s retcode=%s page=%s",
             config["gacha_type"],
@@ -121,6 +162,8 @@ def fetch_pity_data(authkey, config, history_params=None):
         page_pulls = response["data"]["list"]
         pulls.extend(page_pulls)
         if len(page_pulls) < params["size"]:
+            break
+        if page_pulls and str(page_pulls[-1].get("id")) in known_pull_ids:
             break
 
         next_end_id = page_pulls[-1].get("id")
@@ -141,6 +184,7 @@ def fetch_pity_data(authkey, config, history_params=None):
 
     recent_pulls = [
         {
+            "id": pull.get("id"),
             "name": pull["name"],
             "item_type": pull["item_type"],
             "rank_type": pull["rank_type"],
@@ -151,6 +195,6 @@ def fetch_pity_data(authkey, config, history_params=None):
     return {
         "pity": pity_count,
         "guaranteed": is_guaranteed,
-        "statistics": _get_statistics(pulls, config),
+        "statistics": calculate_statistics(pulls, config),
         "recent_pulls": recent_pulls,
     }
