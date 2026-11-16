@@ -50,8 +50,8 @@ Run this while the selected ZZZ channel history is open:
 
 Each command opens the appropriate game's cache, checks the link, and reports whether the URL was copied. The URL contains a temporary authkey; paste it only into this widget and do not share it.
 
-The URL field is hidden by default. After a successful load, the widget shows the eight most recent pulls. Click **Load from Game** again to rerun PowerShell, or click **Use Pasted Link** to reveal the URL field.
-After the first successful submission, switching the warp or channel in the gacha type dropdown automatically reloads the selected banner using the saved history link.
+The URL field is hidden by default. After a successful load, the widget shows the summary statistics and available pulls. Click **Load from Game** again to rerun PowerShell, or click **Use Pasted Link** to reveal the URL field.
+Each load fetches every warp or channel for the selected game. A progress bar shows the batch status, and switching the warp or channel after loading displays its cached result immediately.
 
 The script looks for the authkey in the cache file below. On newer game versions where that cache file is not present, it also reads the game's `Player.log` beside the `Data` folder.
 
@@ -67,19 +67,24 @@ ZZZ:
 %USERPROFILE%\AppData\LocalLow\miHoYo\ZenlessZoneZero\Data\webCaches\Cache\Cache_Data\data_2
 ```
 
-The widget checks the API every 60 seconds after a history is loaded. PowerShell is rerun on each refresh to obtain a fresh URL.
+The widget only requests history after you click **Load from Game** or submit a pasted link. It does not refresh history automatically.
 
 ## Current behavior
 
 - Reads the selected HSR warp: Character Event (`gacha_type=11`), Light Cone Event (`gacha_type=12`), Stellar (`gacha_type=1`), Departure (`gacha_type=2`), Character Collaboration (`gacha_type=21`), or Light Cone Collaboration (`gacha_type=22`); or the selected ZZZ channel: Exclusive (`gacha_type=2001`), Stable (`gacha_type=1`), W-Engine (`gacha_type=3001`), or Bangboo (`gacha_type=5001`).
 - Uses the HSR `api-os-takumi` history endpoint and the ZZZ `public-operation-nap-sg` endpoint, including ZZZ's `game_biz=nap_global` parameter.
-- Displays pity as pulls since the latest highest-rarity pull, up to the 90-pull hard pity limit.
+- Displays pity as pulls since the latest highest-rarity pull, up to the selected banner's hard pity limit.
+- Loads the complete available history and displays summary statistics for total pulls, currency spent, high-rarity counts, average pity, and 50/50 win rate.
 - Shows all pulls returned by the API after a successful load.
+- Prefetches every warp or channel for the selected game from one extracted history URL and shows batch progress while loading.
+- Caches each successfully loaded banner in memory while the widget is running; history requests are always user-initiated.
+- Persists each gacha type's merged pull history at `.cache\<game>\<gacha_type>\history.json` in the project directory, deduplicating records by pull ID when new history is loaded. The cache directory is ignored by Git.
+- When cached history exists, pagination stops at the first page that overlaps saved records, so refreshes request only new pulls.
 - Filters recent pulls by rarity, with the two highest rarities enabled by default.
 - Color-codes HSR pulls as blue for 3★, purple for 4★, and gold for 5★. ZZZ API rank types are labeled and colored blue for B Rank (`2`), purple for A Rank (`3`), and gold for S Rank (`4`).
 - Marks the next limited highest-rarity pull as guaranteed after a loss to one of the standard highest-rarity characters.
 - Uses the header to drag the widget, minimize the content, or close the widget. Click the minimize button again to restore the content.
-- Requests only the first 20 history entries. Older history is not searched, so pity and guarantee status can be incomplete when the latest highest-rarity pull is not on the first page.
+- Pity, guarantee status, and summary statistics use all available history pages returned by the API.
 - Shows API or cache errors in the status line.
 
 ## Notes
