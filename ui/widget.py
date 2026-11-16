@@ -8,8 +8,10 @@ import customtkinter as ctk
 import requests
 from PIL import Image
 
+from api import calculate_statistics
 from config import GAME_CONFIGS
 from extractors import EXTRACTORS
+from history_cache import load_history_cache, merge_pull_history, save_history_cache
 from ui.hsr import HSRUI
 from ui.zzz import ZZZUI
 
@@ -134,6 +136,13 @@ class PullTrackerWidget(ctk.CTk):
         )
         self.status_label.pack(pady=(0, 10))
 
+        self.loading_progress = ctk.CTkProgressBar(
+            self.content_frame,
+            width=340,
+            mode="determinate",
+        )
+        self.loading_progress.set(0)
+
         self.history_url_entry = ctk.CTkEntry(
             self.content_frame,
             width=400,
@@ -177,6 +186,12 @@ class PullTrackerWidget(ctk.CTk):
         self.refresh_after_id = None
         self.recent_pulls = []
         self.history_urls = {}
+        self.history_cache = {}
+        try:
+            self.saved_history = load_history_cache()
+        except (OSError, ValueError) as error:
+            logger.exception("Unable to load saved history cache: %s", error)
+            self.saved_history = {}
         self.history_sources = {}
         self.dragging = False
         self.apply_game_theme()
@@ -190,11 +205,22 @@ class PullTrackerWidget(ctk.CTk):
     def get_banner_keys(self):
         return list(GAME_CONFIGS[self.selected_game]["banners"])
 
+    @staticmethod
+    def get_banner_keys_for_game(game):
+        return list(GAME_CONFIGS[game]["banners"])
+
     def get_selected_config(self):
         return GAME_CONFIGS[self.selected_game]["banners"][self.selected_banner]
 
     def get_theme(self):
         return GAME_CONFIGS[self.selected_game]["theme"]
+
+    def get_known_pull_ids(self, game, banner):
+        return [
+            pull["id"]
+            for pull in self.saved_history.get(f"{game}:{banner}", [])
+            if pull.get("id") is not None
+        ]
 
     def get_rarity_color(self, rarity, fallback):
         return self.get_theme()["rarities"].get(str(rarity), fallback)
@@ -347,6 +373,9 @@ class PullTrackerWidget(ctk.CTk):
         self.apply_game_theme()
         self.configure_banner_selector()
         self.reset_for_selection()
+        cached = self.history_cache.get((self.selected_game, self.selected_banner))
+        if cached:
+            self.display_history_data(self.selected_game, self.selected_banner, cached["data"])
 
     def select_banner(self, banner_label):
         self.selected_banner = next(
@@ -356,6 +385,9 @@ class PullTrackerWidget(ctk.CTk):
         )
         logger.debug("Selected game=%s banner=%s", self.selected_game, self.selected_banner)
         self.reset_for_selection()
+        cached = self.history_cache.get((self.selected_game, self.selected_banner))
+        if cached:
+            self.display_history_data(self.selected_game, self.selected_banner, cached["data"])
 
     def reset_for_selection(self):
         config = self.get_selected_config()
@@ -367,6 +399,7 @@ class PullTrackerWidget(ctk.CTk):
             text="Don't forget open in-game history first",
             text_color=self.get_theme()["error"],
         )
+        self.loading_progress.pack_forget()
         self.recent_pulls_frame.pack_forget()
         self.filter_frame.pack_forget()
         self.configure_rarity_filters()
@@ -377,13 +410,6 @@ class PullTrackerWidget(ctk.CTk):
         if self.refresh_after_id is not None:
             self.after_cancel(self.refresh_after_id)
             self.refresh_after_id = None
-        saved_history_url = self.history_urls.get(self.selected_game)
-        if saved_history_url:
-            self.start_pasted_history(
-                saved_history_url,
-                "Loading selected banner...",
-                allow_gacha_type_mismatch=True,
-            )
         self.adjust_window_size()
 
     def load_history(self):
@@ -399,6 +425,8 @@ class PullTrackerWidget(ctk.CTk):
             text="Running extractor in PowerShell...",
             text_color=self.get_theme()["muted"],
         )
+        self.loading_progress.set(0)
+        self.loading_progress.pack(pady=(0, 6))
         game = self.selected_game
         banner = self.selected_banner
         self.history_sources[game] = "powershell"
@@ -433,6 +461,8 @@ class PullTrackerWidget(ctk.CTk):
         self.load_button.configure(state="disabled", text="Loading...")
         self.pasted_load_button.configure(state="disabled")
         self.status_label.configure(text=status_text, text_color=self.get_theme()["muted"])
+        self.loading_progress.set(0)
+        self.loading_progress.pack(pady=(0, 6))
         game = self.selected_game
         banner = self.selected_banner
         self.history_sources[game] = "pasted"
@@ -442,21 +472,8 @@ class PullTrackerWidget(ctk.CTk):
             daemon=True,
         ).start()
 
-    def fetch_pasted_history(self, game, banner, history_url, allow_gacha_type_mismatch=False):
-        extractor = EXTRACTORS[game]
-        banner_config = GAME_CONFIGS[game]["banners"][banner]
-        logger.debug("Reading pasted history with extractor: game=%s banner=%s", game, banner)
-        try:
-            result = extractor.fetch_pity_data_from_url(
-                history_url,
-                banner_config,
-                allow_gacha_type_mismatch=allow_gacha_type_mismatch,
-            )
-        except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
-            logger.exception("Pasted history load failed: game=%s banner=%s", game, banner)
-            result = {"error": f"Unable to load history: {error}"}
-        logger.debug("Pasted history worker completed: game=%s success=%s", game, "error" not in result)
-        self.after(0, self.show_history_result, game, banner, result, history_url)
+    def fetch_pasted_history(self, game, _banner, history_url, _allow_gacha_type_mismatch=False):
+        self.fetch_history_batch(game, history_url)
 
     def fetch_history(self, game, banner):
         banner_config = GAME_CONFIGS[game]["banners"][banner]
@@ -470,7 +487,11 @@ class PullTrackerWidget(ctk.CTk):
                 result = {"error": "History source not found. Reopen in-game history."}
             else:
                 logger.debug("Authkey found; requesting history API: game=%s banner=%s", game, banner)
-                result = extractor.fetch_pity_data(authkey, banner_config)
+                result = extractor.fetch_pity_data(
+                    authkey,
+                    banner_config,
+                    known_pull_ids=self.get_known_pull_ids(game, banner),
+                )
         except (OSError, UnicodeError, requests.RequestException, ValueError, KeyError, TypeError) as error:
             logger.exception("Local history load failed: game=%s banner=%s", game, banner)
             result = {"error": f"Unable to load history: {error}"}
@@ -509,7 +530,8 @@ class PullTrackerWidget(ctk.CTk):
             if not parsed_url.scheme or not parsed_url.netloc or not query.get("authkey"):
                 raise ValueError("PowerShell did not copy a valid history URL to the clipboard.")
             logger.info("PowerShell copied a valid history URL: game=%s banner=%s", game, banner)
-            result = EXTRACTORS[game].fetch_pity_data_from_url(history_url, banner_config)
+            self.fetch_history_batch(game, history_url)
+            return
         except (
             OSError,
             subprocess.SubprocessError,
@@ -519,10 +541,157 @@ class PullTrackerWidget(ctk.CTk):
             TypeError,
         ) as error:
             logger.exception("PowerShell history load failed: game=%s banner=%s", game, banner)
-            result = {"error": f"Unable to load history from PowerShell: {error}"}
+            self.after(
+                0,
+                self.finish_history_batch,
+                game,
+                {banner: {"error": f"Unable to load history from PowerShell: {error}"}},
+                None,
+            )
 
-        logger.debug("PowerShell history worker completed: game=%s success=%s", game, "error" not in result)
-        self.after(0, self.show_history_result, game, banner, result, history_url if "history_url" in locals() else None)
+    def fetch_history_batch(self, game, history_url):
+        banners = self.get_banner_keys_for_game(game)
+        results = {}
+        for completed, banner in enumerate(banners, start=1):
+            banner_config = GAME_CONFIGS[game]["banners"][banner]
+            logger.debug(
+                "Loading history batch item: game=%s banner=%s progress=%s/%s",
+                game,
+                banner,
+                completed,
+                len(banners),
+            )
+            try:
+                results[banner] = EXTRACTORS[game].fetch_pity_data_from_url(
+                    history_url,
+                    banner_config,
+                    allow_gacha_type_mismatch=True,
+                    known_pull_ids=self.get_known_pull_ids(game, banner),
+                )
+            except (
+                OSError,
+                UnicodeError,
+                requests.RequestException,
+                ValueError,
+                KeyError,
+                TypeError,
+            ) as error:
+                logger.exception("History batch item failed: game=%s banner=%s", game, banner)
+                results[banner] = {"error": f"Unable to load history: {error}"}
+            self.after(
+                0,
+                self.update_history_progress,
+                game,
+                banner,
+                completed,
+                len(banners),
+                results[banner],
+            )
+        self.after(0, self.finish_history_batch, game, results, history_url)
+
+    def update_history_progress(self, game, banner, completed, total, data):
+        if game != self.selected_game:
+            return
+        self.loading_progress.set(completed / total)
+        label = GAME_CONFIGS[game]["banners"][banner]["label"]
+        if "error" in data:
+            status_text = f"Loaded {completed}/{total}; {label} failed."
+        else:
+            status_text = f"Loading {label} ({completed}/{total})..."
+        self.status_label.configure(text=status_text, text_color=self.get_theme()["muted"])
+
+    def finish_history_batch(self, game, results, history_url):
+        if history_url:
+            self.history_urls[game] = history_url
+        for banner, data in results.items():
+            if "error" not in data:
+                self.cache_history_result(game, banner, data, history_url)
+            else:
+                logger.error(
+                    "History batch item returned an error: game=%s banner=%s error=%s",
+                    game,
+                    banner,
+                    data["error"],
+                )
+        if results:
+            try:
+                save_history_cache(self.saved_history)
+            except OSError:
+                logger.exception("Unable to save history cache: game=%s", game)
+
+        if game != self.selected_game:
+            return
+        self.loading = False
+        self.loading_progress.pack_forget()
+        self.load_button.configure(state="normal", text="Load from Game", command=self.load_history)
+        self.pasted_load_button.configure(
+            state="normal",
+            text="Use Pasted Link",
+            command=self.handle_pasted_link,
+        )
+        selected_data = results.get(self.selected_banner)
+        if selected_data is None:
+            return
+        if "error" in selected_data:
+            self.status_label.configure(
+                text=selected_data["error"],
+                text_color=self.get_theme()["error"],
+            )
+        else:
+            self.display_history_data(
+                game,
+                self.selected_banner,
+                self.history_cache[(game, self.selected_banner)]["data"],
+            )
+
+    def cache_history_result(self, game, banner, data, history_url):
+        cache_key = f"{game}:{banner}"
+        merged_pulls = merge_pull_history(
+            self.saved_history.get(cache_key, []),
+            data["recent_pulls"],
+        )
+        self.saved_history[cache_key] = merged_pulls
+        config = GAME_CONFIGS[game]["banners"][banner]
+        cached_data = {
+            **data,
+            "recent_pulls": merged_pulls,
+            "statistics": calculate_statistics(merged_pulls, config),
+        }
+        self.history_cache[(game, banner)] = {
+            "history_url": history_url,
+            "data": cached_data,
+        }
+        return cached_data
+
+    def display_history_data(self, game, banner, data):
+        if game != self.selected_game or banner != self.selected_banner:
+            return
+        config = self.get_selected_config()
+        self.statistics_frame.pack(
+            fill="x",
+            padx=28,
+            pady=(8, 2),
+            before=self.pity_label,
+        )
+        self.pity_label.configure(text=f"{data['pity']} / {config['hard_pity']}")
+        self.update_statistics(data["statistics"])
+        status_text = (
+            "Guaranteed Limited!"
+            if data["guaranteed"]
+            else f"Next {config['highest_rarity_label']} is a 50/50"
+        )
+        color = (
+            self.get_theme()["success"]
+            if data["guaranteed"]
+            else self.get_theme()["secondary"]
+        )
+        self.status_label.configure(text=status_text, text_color=color)
+        self.recent_pulls = data["recent_pulls"]
+        self.show_recent_pulls(self.get_filtered_pulls())
+        self.history_url_entry.pack_forget()
+        self.filter_frame.pack(pady=(0, 4))
+        self.recent_pulls_frame.pack(pady=(0, 6))
+        self.adjust_window_size()
 
     def show_history_result(self, game, banner, data, history_url=None):
         if game != self.selected_game or banner != self.selected_banner:
@@ -538,6 +707,7 @@ class PullTrackerWidget(ctk.CTk):
         logger.debug("Displaying history result: game=%s banner=%s success=%s", game, banner, "error" not in data)
         config = self.get_selected_config()
         self.loading = False
+        self.loading_progress.pack_forget()
         self.load_button.configure(state="normal", text="Load from Game", command=self.load_history)
         self.pasted_load_button.configure(state="normal", text="Use Pasted Link", command=self.handle_pasted_link)
 
@@ -550,6 +720,25 @@ class PullTrackerWidget(ctk.CTk):
         else:
             if history_url:
                 self.history_urls[game] = history_url
+            cache_key = f"{game}:{banner}"
+            merged_pulls = merge_pull_history(
+                self.saved_history.get(cache_key, []),
+                data["recent_pulls"],
+            )
+            self.saved_history[cache_key] = merged_pulls
+            try:
+                save_history_cache(self.saved_history)
+            except OSError:
+                logger.exception("Unable to save history cache: game=%s banner=%s", game, banner)
+            data = {
+                **data,
+                "recent_pulls": merged_pulls,
+                "statistics": calculate_statistics(merged_pulls, config),
+            }
+            self.history_cache[(game, banner)] = {
+                "history_url": history_url,
+                "data": data,
+            }
             self.statistics_frame.pack(
                 fill="x",
                 padx=28,
@@ -577,8 +766,6 @@ class PullTrackerWidget(ctk.CTk):
             self.load_button.configure(text="Load from Game", command=self.load_history)
             self.pasted_load_button.configure(text="Use Pasted Link", command=self.handle_pasted_link)
             self.adjust_window_size()
-
-        self.refresh_after_id = self.after(60000, self.refresh_history)
 
     def show_recent_pulls(self, pulls):
         self.game_ui.show_recent_pulls(pulls)
