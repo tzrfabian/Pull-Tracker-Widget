@@ -10,12 +10,19 @@ def get_authkey(banner_config):
     return get_authkey_from_cache(GAME_CONFIG["cache_path"], banner_config["gacha_type"])
 
 
-def fetch_pity_data(authkey, banner_config):
+def fetch_pity_data(authkey, banner_config, known_pull_ids=None):
     params = get_history_params_from_cache(GAME_CONFIG["cache_path"], banner_config["gacha_type"])
+    if known_pull_ids:
+        params["_known_pull_ids"] = known_pull_ids
     return fetch_api_pity_data(authkey, {**GAME_CONFIG, **banner_config}, params)
 
 
-def fetch_pity_data_from_url(history_url, banner_config, allow_gacha_type_mismatch=False):
+def fetch_pity_data_from_url(
+    history_url,
+    banner_config,
+    allow_gacha_type_mismatch=False,
+    known_pull_ids=None,
+):
     params = get_history_params_from_url(
         history_url,
         banner_config["gacha_type"],
@@ -23,4 +30,6 @@ def fetch_pity_data_from_url(history_url, banner_config, allow_gacha_type_mismat
     )
     if not params:
         return {"error": f"Invalid HSR {banner_config['label']} URL."}
+    if known_pull_ids:
+        params["_known_pull_ids"] = known_pull_ids
     return fetch_api_pity_data(params["authkey"], {**GAME_CONFIG, **banner_config}, params)
